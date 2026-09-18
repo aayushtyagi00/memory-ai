@@ -1,0 +1,57 @@
+/** @type {import('tailwindcss').Config} */
+export default {
+  darkMode: 'class',
+  content: [
+    './index.html',
+    './src/**/*.{js,ts,jsx,tsx}',
+  ],
+  theme: {
+    extend: {
+      colors: {
+        'bg-base': '#0A0A0B',
+        'bg-elevated': '#131316',
+        'bg-hover': '#1C1C21',
+        'border': '#26262C',
+        'border-strong': '#3A3A42',
+        'text-primary': '#F4F4F5',
+        'text-secondary': '#A1A1AA',
+        'text-muted': '#6B6B76',
+        'accent': '#EF4444',
+        'accent-soft': 'rgba(239, 68, 68, 0.12)',
+        'primary': '#ffb3ad',
+        'primary-container': '#ff5451',
+        'on-primary': '#68000a',
+        'surface': '#131314',
+        'surface-dim': '#131314',
+        'surface-bright': '#3a393a',
+        'surface-container': '#201f20',
+        'surface-container-low': '#1c1b1c',
+        'surface-container-high': '#2a2a2b',
+        'surface-container-highest': '#353436',
+        'surface-container-lowest': '#0e0e0f',
+        'success': '#22C55E',
+        'warning': '#EAB308',
+        'error': '#ffb4ab',
+        'on-surface': '#e5e2e3',
+      },
+      fontFamily: {
+        sans: ['Inter', 'sans-serif'],
+        mono: ['JetBrains Mono', 'monospace'],
+        display: ['Inter', 'sans-serif'],
+      },
+      borderRadius: {
+        'DEFAULT': '0.25rem',
+        'lg': '0.5rem',
+        'xl': '0.75rem',
+        '2xl': '1rem',
+        'full': '9999px',
+      },
+      boxShadow: {
+        'glow': '0 0 24px rgba(239, 68, 68, 0.22)',
+        'glow-lg': '0 0 40px rgba(239, 68, 68, 0.3)',
+        'surface': '0 4px 20px rgba(0, 0, 0, 0.4)',
+      },
+    },
+  },
+  plugins: [],
+};

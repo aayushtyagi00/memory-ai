@@ -1,0 +1,599 @@
+<!DOCTYPE html><html class="dark" lang="en"><head><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0" name="viewport"><meta content="web_dashboard" name="shell-type"><link href="https://fonts.googleapis.com" rel="preconnect"><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet"><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config={darkMode:"class",theme:{extend:{colors:{"surface-container-low":"#1c1b1c","on-tertiary":"#303035","on-secondary-container":"#b6b4bc","surface":"#131314","on-secondary-fixed":"#1b1b21","on-tertiary-fixed":"#1b1b20","accent-soft":"rgba(239, 68, 68, 0.12)","surface-container-lowest":"#0e0e0f","bg-hover":"#1C1C21","bg-elevated":"#131316","tertiary-fixed":"#e4e1e8","on-background":"#e5e2e3","inverse-primary":"#b91a24","primary-container":"#ff5451","border":"#26262C","error":"#ffb4ab","error-container":"#93000a","border-strong":"#3A3A42","success":"#22C55E","tertiary-fixed-dim":"#c8c5cc","on-tertiary-fixed-variant":"#47464c","on-surface-variant":"#e4beba","on-error":"#690005","secondary":"#c8c5cd","secondary-fixed":"#e4e1e9","surface-dim":"#131314","primary-fixed-dim":"#ffb3ad","text-secondary":"#A1A1AA","tertiary-container":"#919096","on-error-container":"#ffdad6","surface-container-high":"#2a2a2b","on-surface":"#e5e2e3","on-primary-fixed":"#410004","secondary-container":"#46464d","surface-container-highest":"#353436","bg-base":"#0A0A0B","surface-tint":"#ffb3ad","inverse-on-surface":"#313031","primary-fixed":"#ffdad7","on-primary":"#68000a","on-primary-container":"#5c0008","text-primary":"#F4F4F5","background":"#131314","primary":"#ffb3ad","on-secondary-fixed-variant":"#46464d","surface-container":"#201f20","tertiary":"#c8c5cc","on-primary-fixed-variant":"#930013","warning":"#EAB308","on-tertiary-container":"#29292e","inverse-surface":"#e5e2e3","surface-bright":"#3a393a","accent":"#EF4444","outline-variant":"#5b403e","outline":"#ab8986","surface-variant":"#353436","secondary-fixed-dim":"#c8c5cd","text-muted":"#6B6B76","on-secondary":"#303036"},borderRadius:{"DEFAULT":"0.25rem","lg":"0.5rem","xl":"0.75rem","full":"9999px"},spacing:{"space-2xl":"2.5rem","space-3xl":"3rem","space-xl":"2rem","space-xs":"0.5rem","space-md":"1rem","margin-tablet":"1.5rem","margin":"1rem","space-sm":"0.75rem","margin-desktop":"2rem","gutter":"1rem","space-2xs":"0.25rem","gutter-desktop":"1.5rem","space-lg":"1.5rem"},fontFamily:{"headline-lg":["Inter"],"body-sm":["Inter"],"label-mono-sm":["JetBrains Mono"],"headline-sm":["Inter"],"display-hero":["Inter"],"headline-md":["Inter"],"body-lg":["Inter"],"body-md-medium":["Inter"],"body-md":["Inter"],"display-hero-mobile":["Inter"],"label-mono-lg":["JetBrains Mono"],"stat-mono":["JetBrains Mono"]},fontSize:{"headline-lg":["28px",{"lineHeight":"36px","letterSpacing":"-0.02em","fontWeight":"600"}],"body-sm":["13px",{"lineHeight":"20px","fontWeight":"400"}],"label-mono-sm":["11px",{"lineHeight":"16px","letterSpacing":"0.04em","fontWeight":"500"}],"headline-sm":["18px",{"lineHeight":"24px","letterSpacing":"-0.01em","fontWeight":"600"}],"display-hero":["60px",{"lineHeight":"68px","letterSpacing":"-0.03em","fontWeight":"700"}],"headline-md":["22px",{"lineHeight":"28px","letterSpacing":"-0.015em","fontWeight":"600"}],"body-lg":["16px",{"lineHeight":"26px","fontWeight":"400"}],"body-md-medium":["14px",{"lineHeight":"22px","fontWeight":"500"}],"body-md":["14px",{"lineHeight":"22px","fontWeight":"400"}],"display-hero-mobile":["36px",{"lineHeight":"44px","letterSpacing":"-0.025em","fontWeight":"700"}],"label-mono-lg":["13px",{"lineHeight":"18px","letterSpacing":"-0.01em","fontWeight":"500"}],"stat-mono":["32px",{"lineHeight":"38px","letterSpacing":"-0.02em","fontWeight":"600"}]}}}};</script></head><body class="bg-bg-base font-body-md text-text-primary min-h-screen"><aside class="fixed left-0 top-0 h-full w-[240px] bg-bg-elevated z-50 flex flex-col border-r border-border justify-between"><div class="flex flex-col"><div class="h-12 px-space-md flex items-center gap-space-xs border-b border-border"><img alt="Brand logo" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1VpGfiThLWaMOO76r99e6YbUWRnJEOe6YlDPypWtK-Gao8T7h_k7ZPedGLfMS2NsdL6Bo8tb1ep1vNlrOfDP9BBdqlcECMH3wUOdx02ltdkgmSv0FPzA_NQUwLh-7hDdHQapkqWKzZWPuxoytCGBCxYcdAY2kD4Bbopewb8c-j7NSmT5UQwch9CwwLJ6YlBm1umSixQ_AQ4yqTOvDOhywfMtqlMgmNKn4JtZksiMk70HbdwzZV-urmbDBEX"><span class="font-label-mono-lg text-label-mono-lg font-semibold tracking-tight text-text-primary uppercase">MEMORY AI</span></div><nav class="flex flex-col gap-space-2xs px-space-xs py-space-sm" data-active-classes="bg-accent-soft text-text-primary font-medium before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[3px] before:bg-accent before:rounded-full [&gt;span]:text-accent"><a class="relative flex items-center gap-space-sm px-space-sm py-space-xs rounded-lg text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors font-body-md text-body-md" data-path="dashboard" href="#"><span class="material-symbols-outlined text-[18px]">home</span>Home</a><a class="relative flex items-center gap-space-sm px-space-sm py-space-xs rounded-lg text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors font-body-md text-body-md" data-path="ask-memory" href="#"><span class="material-symbols-outlined text-[18px]">chat_bubble</span>Ask Memory</a><a class="relative flex items-center gap-space-sm px-space-sm py-space-xs rounded-lg text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors font-body-md text-body-md" data-path="memories" href="#"><span class="material-symbols-outlined text-[18px]">database</span>Memories</a><a class="relative flex items-center gap-space-sm px-space-sm py-space-xs rounded-lg text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors font-body-md text-body-md" data-path="timeline" href="#"><span class="material-symbols-outlined text-[18px]">schedule</span>Timeline</a><a class="relative flex items-center gap-space-sm px-space-sm py-space-xs rounded-lg font-medium transition-colors font-body-md text-body-md bg-accent-soft text-text-primary before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[3px] before:bg-accent before:rounded-full" data-path="reminders" href="#"><span class="material-symbols-outlined text-[18px] text-accent">notifications</span>Reminders</a><a class="relative flex items-center gap-space-sm px-space-sm py-space-xs rounded-lg text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors font-body-md text-body-md" data-path="settings" href="#"><span class="material-symbols-outlined text-[18px]">settings</span>Settings</a></nav></div><div class="p-space-xs border-t border-border"><div class="flex items-center justify-between p-space-xs rounded-lg hover:bg-bg-hover transition-colors"><div class="flex items-center gap-space-xs min-w-0"><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div><div class="flex flex-col min-w-0"><span class="font-body-md-medium text-body-md-medium text-text-primary truncate">Alex Chen</span><span class="font-label-mono-sm text-label-mono-sm text-text-muted truncate">alex.chen@domain.edu</span></div></div><button class="text-text-muted hover:text-accent transition-colors p-space-2xs flex items-center" title="Sign out" type="button"><span class="material-symbols-outlined text-[18px]">logout</span></button></div></div></aside><div class="pl-[240px]"><header class="fixed top-0 left-[240px] right-0 h-12 bg-bg-elevated/90 backdrop-blur-xl border-b border-border z-40 flex items-center justify-between px-space-lg"><div class="flex items-center gap-space-md"><div class="flex items-center gap-space-xs font-label-mono-sm text-label-mono-sm uppercase tracking-wider"><span class="material-symbols-outlined text-[14px] text-accent">notifications</span><span class="text-text-primary font-medium">Reminders</span><span class="text-text-muted">/</span><span class="text-text-secondary">Schedule &amp; Triggers</span></div></div><div class="flex items-center gap-space-md"><div class="flex items-center gap-space-xs px-space-sm py-[4px] rounded-full bg-success/10 border border-success/20"><span class="w-1.5 h-1.5 rounded-full bg-success animate-pulse"></span><span class="font-label-mono-sm text-label-mono-sm uppercase text-text-primary font-medium tracking-wide">● INDEX SYNCED</span></div><button class="flex items-center gap-space-2xs bg-accent hover:brightness-110 active:scale-95 text-white px-space-md py-1.5 rounded-[10px] font-body-md-medium text-body-md-medium transition-all shadow-[0_0_16px_rgba(239,68,68,0.25)]" type="button"><span class="material-symbols-outlined text-[16px]">add</span><span class="">+ Add Memory</span></button><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></header><main class="relative pt-12 min-h-screen bg-bg-base"><div class="flex flex-col w-full">
+<!-- Sticky Offline Alert Banner -->
+<div class="sticky top-0 z-30 w-full bg-bg-elevated px-space-lg py-2.5 flex items-center justify-between shadow-md" id="offline-banner">
+<div class="flex items-center gap-space-sm min-w-0">
+<span class="relative flex h-2 w-2">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-warning opacity-75"></span>
+<span class="relative inline-flex rounded-full h-2 w-2 bg-warning"></span>
+</span>
+<p class="font-body-sm text-body-sm text-text-primary truncate">
+        You are offline. Your saved memories will sync when you reconnect.
+      </p>
+<span class="hidden md:inline-block px-space-xs py-0.5 rounded bg-surface-container font-label-mono-sm text-label-mono-sm text-text-muted">
+        CACHE: 4 PENDING OPERATIONS
+      </span>
+</div>
+<div class="flex items-center gap-space-xs shrink-0">
+<button class="group flex items-center gap-1.5 px-space-sm py-1 rounded bg-bg-hover hover:bg-surface-container font-label-mono-sm text-label-mono-sm text-text-primary transition-all" id="retry-sync-btn" type="button">
+<span class="material-symbols-outlined text-[14px] text-text-secondary group-hover:rotate-180 transition-transform">sync</span>
+<span class="">Re-check Connection</span>
+</button>
+<button class="p-1 rounded text-text-muted hover:text-text-primary hover:bg-bg-hover transition-colors" onclick="document.getElementById('offline-banner').classList.add('hidden')" type="button">
+<span class="material-symbols-outlined text-[16px]">close</span>
+</button>
+</div>
+</div>
+<div class="w-full max-w-[1200px] mx-auto px-space-lg py-space-xl flex flex-col gap-space-3xl">
+<!-- Header Block -->
+<header class="flex flex-col md:flex-row md:items-end justify-between gap-space-lg pb-space-lg">
+<div class="flex flex-col gap-space-xs max-w-2xl">
+<div class="flex items-center gap-space-xs">
+<span class="w-1.5 h-1.5 rounded-full bg-accent animate-pulse"></span>
+<span class="font-label-mono-sm text-label-mono-sm uppercase tracking-widest text-accent font-semibold">
+            DESIGN SYSTEM SPECIFICATION // COMPONENT RUNTIME STATES
+          </span>
+</div>
+<h1 class="font-headline-lg text-headline-lg text-text-primary tracking-tight">
+          States &amp; Overlays
+        </h1>
+<p class="font-body-md text-body-md text-text-secondary">
+          Living reference atlas for skeleton shimmers, toast alerts, destructive modal workflows, and vector synchronization states across MEMORY AI core runtime.
+        </p>
+</div>
+<div class="flex items-center gap-space-sm shrink-0">
+<span class="px-space-sm py-1 rounded-full bg-surface-container font-label-mono-sm text-label-mono-sm text-text-muted">
+          SPEC v2.4.1
+        </span>
+<button class="flex items-center gap-space-xs px-space-md py-1.5 rounded-lg bg-bg-elevated hover:bg-bg-hover font-label-mono-sm text-label-mono-sm text-text-primary transition-colors" id="toggle-shimmer-btn" type="button">
+<span class="material-symbols-outlined text-[15px] text-accent">play_circle</span>
+<span class="">Toggle Animation Preview</span>
+</button>
+</div>
+</header>
+<!-- SECTION 1: SKELETON LOADERS -->
+<section class="flex flex-col gap-space-lg">
+<div class="flex items-center justify-between pb-space-xs">
+<div class="flex items-center gap-space-xs">
+<span class="font-label-mono-sm text-label-mono-sm text-accent">01.</span>
+<h2 class="font-headline-sm text-headline-sm text-text-primary">Skeleton Loaders &amp; Hydration Shimmers</h2>
+</div>
+<span class="font-label-mono-sm text-label-mono-sm text-text-muted uppercase">SURFACE-CONTAINER-LOW // ANIMATE-PULSE</span>
+</div>
+<!-- A. Dashboard Stat Cards Skeletons -->
+<div class="flex flex-col gap-space-sm">
+  <div class="flex items-center justify-between">
+    <div class="flex items-center gap-space-xs font-label-mono-sm text-label-mono-sm uppercase text-text-secondary tracking-wider">
+      <span class="w-1.5 h-1.5 rounded-full bg-accent"></span>
+      <span class="">A. DASHBOARD METRIC CARDS · HYDRATION PHASE</span>
+    </div>
+    <span class="font-label-mono-sm text-label-mono-sm text-text-muted uppercase">4-SLOT STAT ARRAY</span>
+  </div>
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-space-md">
+    <!-- Stat 1: Total Memories -->
+    <div class="shimmer-target rounded-xl bg-bg-elevated border border-border p-space-lg flex flex-col justify-between gap-space-md shadow-sm relative overflow-hidden">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center animate-pulse">
+            <div class="w-4 h-4 rounded bg-surface-container-highest"></div>
+          </div>
+          <div class="h-3 w-24 bg-surface-container-highest rounded animate-pulse"></div>
+        </div>
+        <div class="h-4 w-12 rounded-full bg-success/10 border border-success/20 animate-pulse"></div>
+      </div>
+      <div class="flex flex-col gap-1.5">
+        <div class="h-8 w-28 bg-surface-container-highest rounded animate-pulse"></div>
+        <div class="h-2.5 w-36 bg-surface-container-high rounded animate-pulse"></div>
+      </div>
+      <div class="h-7 w-full bg-surface-container rounded-md animate-pulse flex items-end gap-1 px-1.5 py-1">
+        <div class="h-2 w-full bg-surface-container-highest rounded-sm"></div>
+        <div class="h-3 w-full bg-surface-container-highest rounded-sm"></div>
+        <div class="h-4.5 w-full bg-surface-container-highest rounded-sm"></div>
+        <div class="h-3.5 w-full bg-surface-container-highest rounded-sm"></div>
+        <div class="h-5 w-full bg-surface-container-highest rounded-sm"></div>
+        <div class="h-4 w-full bg-surface-container-highest rounded-sm"></div>
+        <div class="h-6 w-full bg-surface-container-highest rounded-sm"></div>
+      </div>
+    </div>
+
+    <!-- Stat 2: Documents -->
+    <div class="shimmer-target rounded-xl bg-bg-elevated border border-border p-space-lg flex flex-col justify-between gap-space-md shadow-sm relative overflow-hidden">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center animate-pulse">
+            <div class="w-4 h-4 rounded bg-surface-container-highest"></div>
+          </div>
+          <div class="h-3 w-20 bg-surface-container-highest rounded animate-pulse"></div>
+        </div>
+        <div class="h-4 w-10 rounded-full bg-surface-container-high animate-pulse"></div>
+      </div>
+      <div class="flex flex-col gap-1.5">
+        <div class="h-8 w-20 bg-surface-container-highest rounded animate-pulse"></div>
+        <div class="h-2.5 w-32 bg-surface-container-high rounded animate-pulse"></div>
+      </div>
+      <div class="pt-2 border-t border-border flex items-center justify-between">
+        <div class="h-2.5 w-24 bg-surface-container-high rounded animate-pulse"></div>
+        <div class="h-2.5 w-12 bg-surface-container-highest rounded animate-pulse"></div>
+      </div>
+    </div>
+
+    <!-- Stat 3: Notes -->
+    <div class="shimmer-target rounded-xl bg-bg-elevated border border-border p-space-lg flex flex-col justify-between gap-space-md shadow-sm relative overflow-hidden">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center animate-pulse">
+            <div class="w-4 h-4 rounded bg-surface-container-highest"></div>
+          </div>
+          <div class="h-3 w-16 bg-surface-container-highest rounded animate-pulse"></div>
+        </div>
+        <div class="h-4 w-10 rounded-full bg-surface-container-high animate-pulse"></div>
+      </div>
+      <div class="flex flex-col gap-1.5">
+        <div class="h-8 w-24 bg-surface-container-highest rounded animate-pulse"></div>
+        <div class="h-2.5 w-28 bg-surface-container-high rounded animate-pulse"></div>
+      </div>
+      <div class="pt-2 border-t border-border flex items-center justify-between">
+        <div class="h-2.5 w-20 bg-surface-container-high rounded animate-pulse"></div>
+        <div class="h-2.5 w-14 bg-surface-container-highest rounded animate-pulse"></div>
+      </div>
+    </div>
+
+    <!-- Stat 4: Images & Media -->
+    <div class="shimmer-target rounded-xl bg-bg-elevated border border-border p-space-lg flex flex-col justify-between gap-space-md shadow-sm relative overflow-hidden">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center animate-pulse">
+            <div class="w-4 h-4 rounded bg-surface-container-highest"></div>
+          </div>
+          <div class="h-3 w-20 bg-surface-container-highest rounded animate-pulse"></div>
+        </div>
+        <div class="h-4 w-10 rounded-full bg-surface-container-high animate-pulse"></div>
+      </div>
+      <div class="flex flex-col gap-1.5">
+        <div class="h-8 w-16 bg-surface-container-highest rounded animate-pulse"></div>
+        <div class="h-2.5 w-24 bg-surface-container-high rounded animate-pulse"></div>
+      </div>
+      <div class="pt-2 border-t border-border flex items-center justify-between">
+        <div class="h-2.5 w-16 bg-surface-container-high rounded animate-pulse"></div>
+        <div class="h-2.5 w-16 bg-surface-container-highest rounded animate-pulse"></div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- B. Chat Thread Loading Skeleton & Multi-stage Ticker -->
+<div class="flex flex-col gap-space-xs mt-space-md">
+<span class="font-label-mono-sm text-label-mono-sm text-text-secondary">B. RETRIEVAL SYNTHESIS &amp; CITATION GROUNDING STREAM</span>
+<div class="rounded-xl bg-bg-elevated p-space-lg flex flex-col gap-space-lg shadow-sm">
+<!-- Stage Ticker -->
+<div class="flex flex-wrap items-center justify-between gap-space-sm p-space-sm rounded-lg bg-bg-base">
+<div class="flex items-center gap-space-sm">
+<span class="w-2 h-2 rounded-full bg-accent animate-ping"></span>
+<div class="font-label-mono-sm text-label-mono-sm text-text-primary tracking-wide" id="status-ticker">● GROUNDING ANSWER TO EVIDENCE VECTORS... [139.1ms]</div>
+</div>
+<div class="flex items-center gap-space-xs font-label-mono-sm text-label-mono-sm text-text-muted">
+<span class="text-success">INDEX HOT</span>
+<span class="">·</span>
+<span class="">TOP-K: 8 CHUNKS</span>
+<span class="">·</span>
+<span class="">HNSW VECTOR PASS</span>
+</div>
+</div>
+<!-- User Query Mock Bubble -->
+<div class="flex justify-end">
+<div class="max-w-md rounded-xl bg-surface-container p-space-md flex flex-col gap-2">
+<div class="h-3.5 w-64 bg-surface-container-highest rounded animate-pulse"></div>
+<div class="h-3.5 w-40 bg-surface-container-highest rounded animate-pulse"></div>
+</div>
+</div>
+<!-- AI Answer Synthesizer Skeleton -->
+<div class="rounded-xl bg-surface-container-lowest p-space-lg flex flex-col gap-space-md">
+<div class="flex items-center justify-between pb-space-xs">
+<div class="flex items-center gap-space-xs">
+<div class="w-6 h-6 rounded-md bg-accent-soft flex items-center justify-center">
+<span class="material-symbols-outlined text-[15px] text-accent">auto_awesome</span>
+</div>
+<span class="font-label-mono-sm text-label-mono-sm uppercase text-text-primary font-medium">Memory AI Response</span>
+</div>
+<span class="font-label-mono-sm text-label-mono-sm text-text-muted">SYNTHESIZING...</span>
+</div>
+<!-- Staggered lines -->
+<div class="flex flex-col gap-2.5 shimmer-target">
+<div class="h-3 w-11/12 bg-surface-container-highest rounded animate-pulse"></div>
+<div class="h-3 w-4/5 bg-surface-container-highest rounded animate-pulse"></div>
+<div class="h-3 w-3/5 bg-surface-container-highest rounded animate-pulse"></div>
+</div>
+<!-- Mini Source Citation Blocks Shimmer -->
+<div class="pt-space-xs flex flex-col gap-space-xs">
+<span class="font-label-mono-sm text-label-mono-sm text-text-muted uppercase tracking-wider">Grounded Citations (2 Pending)</span>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-space-xs">
+<div class="rounded-lg bg-bg-elevated p-3 flex items-center justify-between">
+<div class="flex items-center gap-space-xs">
+<div class="w-5 h-5 rounded bg-surface-container-highest animate-pulse"></div>
+<div class="h-3 w-36 bg-surface-container-highest rounded animate-pulse"></div>
+</div>
+<div class="h-3 w-12 bg-surface-container-high rounded animate-pulse"></div>
+</div>
+<div class="rounded-lg bg-bg-elevated p-3 flex items-center justify-between">
+<div class="flex items-center gap-space-xs">
+<div class="w-5 h-5 rounded bg-surface-container-highest animate-pulse"></div>
+<div class="h-3 w-44 bg-surface-container-highest rounded animate-pulse"></div>
+</div>
+<div class="h-3 w-12 bg-surface-container-high rounded animate-pulse"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- C. Memory Grid Loading Skeletons -->
+<div class="flex flex-col gap-space-xs mt-space-md">
+<span class="font-label-mono-sm text-label-mono-sm text-text-secondary">C. VAULT ARTIFACT GRID (3-COLUMN SKELETONS)</span>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-space-md">
+<div class="rounded-xl bg-bg-elevated p-space-lg flex flex-col justify-between gap-space-lg shadow-sm">
+<div class="flex items-start justify-between">
+<div class="w-12 h-12 rounded-lg bg-surface-container-highest animate-pulse"></div>
+<div class="h-5 w-20 rounded-full bg-surface-container-high animate-pulse"></div>
+</div>
+<div class="flex flex-col gap-2">
+<div class="h-4 w-3/4 bg-surface-container-highest rounded animate-pulse"></div>
+<div class="h-3 w-1/2 bg-surface-container-high rounded animate-pulse"></div>
+</div>
+<div class="pt-space-xs flex items-center justify-between">
+<div class="h-3 w-24 bg-surface-container-high rounded animate-pulse"></div>
+<div class="h-3 w-12 bg-surface-container-highest rounded animate-pulse"></div>
+</div>
+</div>
+<div class="rounded-xl bg-bg-elevated p-space-lg flex flex-col justify-between gap-space-lg shadow-sm">
+<div class="flex items-start justify-between">
+<div class="w-12 h-12 rounded-lg bg-surface-container-highest animate-pulse"></div>
+<div class="h-5 w-20 rounded-full bg-surface-container-high animate-pulse"></div>
+</div>
+<div class="flex flex-col gap-2">
+<div class="h-4 w-5/6 bg-surface-container-highest rounded animate-pulse"></div>
+<div class="h-3 w-2/3 bg-surface-container-high rounded animate-pulse"></div>
+</div>
+<div class="pt-space-xs flex items-center justify-between">
+<div class="h-3 w-28 bg-surface-container-high rounded animate-pulse"></div>
+<div class="h-3 w-12 bg-surface-container-highest rounded animate-pulse"></div>
+</div>
+</div>
+<div class="rounded-xl bg-bg-elevated p-space-lg flex flex-col justify-between gap-space-lg shadow-sm">
+<div class="flex items-start justify-between">
+<div class="w-12 h-12 rounded-lg bg-surface-container-highest animate-pulse"></div>
+<div class="h-5 w-20 rounded-full bg-surface-container-high animate-pulse"></div>
+</div>
+<div class="flex flex-col gap-2">
+<div class="h-4 w-2/3 bg-surface-container-highest rounded animate-pulse"></div>
+<div class="h-3 w-1/3 bg-surface-container-high rounded animate-pulse"></div>
+</div>
+<div class="pt-space-xs flex items-center justify-between">
+<div class="h-3 w-20 bg-surface-container-high rounded animate-pulse"></div>
+<div class="h-3 w-12 bg-surface-container-highest rounded animate-pulse"></div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- SECTION 2: TOAST NOTIFICATIONS & ALERT SYSTEM -->
+<section class="flex flex-col gap-space-lg">
+<div class="flex items-center justify-between pb-space-xs">
+<div class="flex items-center gap-space-xs">
+<span class="font-label-mono-sm text-label-mono-sm text-accent">02.</span>
+<h2 class="font-headline-sm text-headline-sm text-text-primary">Toast Notifications &amp; System Alerts</h2>
+</div>
+<span class="font-label-mono-sm text-label-mono-sm text-text-muted uppercase">SURFACE-ELEVATED // Z-INDEX: 50</span>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-space-md">
+<!-- Toast 1: Success -->
+<div class="rounded-xl bg-bg-elevated p-space-md shadow-xl flex items-start justify-between gap-space-md transition-all hover:bg-bg-hover">
+<div class="flex items-start gap-space-sm min-w-0">
+<div class="w-8 h-8 rounded-lg bg-success/10 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-success text-[18px]">check_circle</span>
+</div>
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-space-xs">
+<span class="font-body-md-medium text-body-md-medium text-text-primary truncate">Memory Indexed Successfully</span>
+<span class="px-1.5 py-0.5 rounded bg-success/15 font-label-mono-sm text-label-mono-sm text-success">OK</span>
+</div>
+<p class="font-body-sm text-body-sm text-text-secondary truncate mt-0.5">
+<span class="font-label-mono-sm text-text-primary">course_syllabus.pdf</span> parsed with 18 chunk vectors.
+              </p>
+<div class="flex items-center gap-2 mt-1.5 font-label-mono-sm text-label-mono-sm text-text-muted">
+<span class="">LATENCY: 140ms</span>
+<span class="">·</span>
+<span class="">EMBED: text-embedding-3-small</span>
+</div>
+</div>
+</div>
+<button class="text-text-muted hover:text-text-primary transition-colors p-1" title="Dismiss" type="button">
+<span class="material-symbols-outlined text-[16px]">close</span>
+</button>
+</div>
+<!-- Toast 2: Error -->
+<div class="rounded-xl bg-bg-elevated p-space-md shadow-xl flex items-start justify-between gap-space-md transition-all hover:bg-bg-hover">
+<div class="flex items-start gap-space-sm min-w-0">
+<div class="w-8 h-8 rounded-lg bg-accent/15 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-accent text-[18px]">error</span>
+</div>
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-space-xs">
+<span class="font-body-md-medium text-body-md-medium text-text-primary truncate">Ingestion Failed</span>
+<span class="px-1.5 py-0.5 rounded bg-accent/20 font-label-mono-sm text-label-mono-sm text-accent">ERR_LIMIT</span>
+</div>
+<p class="font-body-sm text-body-sm text-text-secondary truncate mt-0.5">
+<span class="font-label-mono-sm text-text-primary">biometric_safety_cert.pdf</span> exceeds vector limit.
+              </p>
+<div class="flex items-center gap-space-sm mt-2">
+<button class="font-label-mono-sm text-label-mono-sm text-accent hover:underline flex items-center gap-1 font-semibold" type="button">
+<span class="material-symbols-outlined text-[13px]">replay</span>
+<span class="">Retry Ingest</span>
+</button>
+<span class="text-text-muted text-label-mono-sm">·</span>
+<button class="font-label-mono-sm text-label-mono-sm text-text-muted hover:text-text-primary" type="button">
+                  View Parser Logs
+                </button>
+</div>
+</div>
+</div>
+<button class="text-text-muted hover:text-text-primary transition-colors p-1" title="Dismiss" type="button">
+<span class="material-symbols-outlined text-[16px]">close</span>
+</button>
+</div>
+<!-- Toast 3: Session Expiry -->
+<div class="rounded-xl bg-bg-elevated p-space-md shadow-xl flex items-start justify-between gap-space-md transition-all hover:bg-bg-hover">
+<div class="flex items-start gap-space-sm min-w-0">
+<div class="w-8 h-8 rounded-lg bg-warning/15 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-warning text-[18px]">lock_clock</span>
+</div>
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-space-xs">
+<span class="font-body-md-medium text-body-md-medium text-text-primary">Session Expired</span>
+<span class="px-1.5 py-0.5 rounded bg-warning/15 font-label-mono-sm text-label-mono-sm text-warning">AUTH_401</span>
+</div>
+<p class="font-body-sm text-body-sm text-text-secondary mt-0.5">
+                Your bearer token timed out. Refresh your session to continue indexing.
+              </p>
+<div class="mt-2">
+<a class="inline-flex items-center gap-1 px-space-sm py-1 rounded bg-bg-hover hover:bg-surface-container font-label-mono-sm text-label-mono-sm text-text-primary transition-colors" href="#">
+<span class="">Sign In</span>
+<span class="material-symbols-outlined text-[12px]">arrow_forward</span>
+</a>
+</div>
+</div>
+</div>
+<button class="text-text-muted hover:text-text-primary transition-colors p-1" title="Dismiss" type="button">
+<span class="material-symbols-outlined text-[16px]">close</span>
+</button>
+</div>
+<!-- Toast 4: Copy Citation -->
+<div class="rounded-xl bg-bg-elevated p-space-md shadow-xl flex items-start justify-between gap-space-md transition-all hover:bg-bg-hover">
+<div class="flex items-start gap-space-sm min-w-0">
+<div class="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-text-primary text-[18px]">assignment_turned_in</span>
+</div>
+<div class="flex flex-col min-w-0">
+<span class="font-body-md-medium text-body-md-medium text-text-primary">Citation Anchor Copied</span>
+<p class="font-body-sm text-body-sm text-text-secondary mt-0.5">
+                Target vector hash <span class="font-label-mono-sm text-accent">#vec-90f72a</span> added to system clipboard.
+              </p>
+<div class="flex items-center gap-2 mt-1.5 font-label-mono-sm text-label-mono-sm text-text-muted">
+<span class="">FORMAT: MARKDOWN_ANCHOR</span>
+<span class="">·</span>
+<span class="">100% GROUNDED</span>
+</div>
+</div>
+</div>
+<button class="text-text-muted hover:text-text-primary transition-colors p-1" title="Dismiss" type="button">
+<span class="material-symbols-outlined text-[16px]">close</span>
+</button>
+</div>
+</div>
+</section>
+<!-- SECTION 3: CONFIRM-DELETE DIALOG & OVERLAYS -->
+<section class="flex flex-col gap-space-lg">
+<div class="flex items-center justify-between pb-space-xs">
+<div class="flex items-center gap-space-xs">
+<span class="font-label-mono-sm text-label-mono-sm text-accent">03.</span>
+<h2 class="font-headline-sm text-headline-sm text-text-primary">Confirmation Dialog &amp; Scrim Viewport</h2>
+</div>
+<span class="font-label-mono-sm text-label-mono-sm text-text-muted uppercase">MODAL OVERLAY CANVAS // SHADOW-2XL</span>
+</div>
+<!-- Scrim Demonstration Box -->
+<div class="relative w-full rounded-2xl bg-bg-base p-space-xl min-h-[460px] flex items-center justify-center overflow-hidden">
+<!-- Visual Backdrop Simulation to show scrim blur effect -->
+<div class="absolute inset-0 opacity-15 pointer-events-none p-space-lg flex flex-col justify-between select-none">
+<div class="grid grid-cols-3 gap-4">
+<div class="h-20 bg-surface-container rounded-lg"></div>
+<div class="h-20 bg-surface-container rounded-lg"></div>
+<div class="h-20 bg-surface-container rounded-lg"></div>
+</div>
+<div class="h-32 bg-surface-container rounded-lg"></div>
+<div class="grid grid-cols-2 gap-4">
+<div class="h-24 bg-surface-container rounded-lg"></div>
+<div class="h-24 bg-surface-container rounded-lg"></div>
+</div>
+</div>
+<!-- Dimming Layer -->
+<div class="absolute inset-0 bg-bg-base/80 backdrop-blur-md"></div>
+<!-- Centered Modal Component -->
+<div class="relative z-10 w-full max-w-lg rounded-2xl bg-bg-elevated p-space-xl flex flex-col gap-space-lg shadow-2xl">
+<!-- Top Row with Danger Glyph & Close -->
+<div class="flex items-start justify-between">
+<div class="w-11 h-11 rounded-xl bg-accent-soft flex items-center justify-center shadow-inner">
+<span class="material-symbols-outlined text-accent text-[22px]">delete_forever</span>
+</div>
+<button class="p-1 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-hover transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">close</span>
+</button>
+</div>
+<!-- Dialog Text -->
+<div class="flex flex-col gap-space-xs">
+<div class="flex items-center gap-2">
+<h3 class="font-headline-md text-headline-md text-text-primary tracking-tight">Delete all memories?</h3>
+<span class="px-2 py-0.5 rounded bg-accent/15 font-label-mono-sm text-label-mono-sm text-accent font-semibold">IRREVERSIBLE</span>
+</div>
+<p class="font-body-md text-body-md text-text-secondary">
+              This permanently removes your uploaded information from this account. Ingestion indexes, vector embeddings, and evidence citations will cease to exist immediately. This action cannot be undone.
+            </p>
+</div>
+<!-- Impact Audit Callout -->
+<div class="rounded-lg bg-bg-base p-space-md flex flex-col gap-1.5 font-label-mono-sm text-label-mono-sm">
+<div class="flex items-center justify-between text-text-muted">
+<span class="uppercase">Vector Index Audit</span>
+<span class="text-accent font-medium">REVOCATION TARGET</span>
+</div>
+<div class="text-text-primary font-mono tracking-tight text-xs flex flex-wrap gap-x-3 gap-y-1">
+<span class="">● 142 indexed files</span>
+<span class="">● 58.4 MB vector storage</span>
+<span class="">● SHA-256 keys purged</span>
+</div>
+</div>
+<!-- Action Footers -->
+<div class="flex flex-col sm:flex-row items-center justify-end gap-space-sm pt-space-xs">
+<button class="w-full sm:w-auto px-space-lg py-2 rounded-lg bg-surface-container hover:bg-surface-container-high font-body-md-medium text-body-md-medium text-text-primary transition-colors text-center" type="button">
+              Cancel
+            </button>
+<button class="w-full sm:w-auto px-space-lg py-2 rounded-lg bg-accent hover:brightness-110 active:scale-95 font-body-md-medium text-body-md-medium text-white transition-all shadow-[0_0_16px_rgba(239,68,68,0.25)] flex items-center justify-center gap-2" type="button">
+<span class="material-symbols-outlined text-[16px]">warning</span>
+<span class="">Delete All Memories</span>
+</button>
+</div>
+</div>
+</div>
+</section>
+<!-- SECTION 4: STATUS PILL SPECIFICATION & RESOLUTION STATES -->
+<section class="flex flex-col gap-space-lg">
+<div class="flex items-center justify-between pb-space-xs">
+<div class="flex items-center gap-space-xs">
+<span class="font-label-mono-sm text-label-mono-sm text-accent">04.</span>
+<h2 class="font-headline-sm text-headline-sm text-text-primary">Status Pill Matrix &amp; Resolution States</h2>
+</div>
+<span class="font-label-mono-sm text-label-mono-sm text-text-muted uppercase">MONOSPACED // RUNTIME CONTRACT</span>
+</div>
+<div class="rounded-xl bg-bg-elevated p-space-lg flex flex-col gap-space-lg shadow-sm">
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-space-md">
+<!-- 1. Ready / Indexed -->
+<div class="rounded-lg bg-bg-base p-space-md flex flex-col justify-between gap-space-sm">
+<span class="font-label-mono-sm text-label-mono-sm text-text-muted">STATE: READY</span>
+<div>
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-success/10 font-label-mono-sm text-label-mono-sm text-text-primary">
+<span class="w-1.5 h-1.5 rounded-full bg-success"></span>
+<span class="font-medium tracking-wide">INDEXED</span>
+</span>
+</div>
+<p class="font-body-sm text-body-sm text-text-secondary">
+              Fully embedded and queryable in vector space.
+            </p>
+</div>
+<!-- 2. Processing / Indexing -->
+<div class="rounded-lg bg-bg-base p-space-md flex flex-col justify-between gap-space-sm">
+<span class="font-label-mono-sm text-label-mono-sm text-text-muted">STATE: RUNNING</span>
+<div>
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-warning/10 font-label-mono-sm text-label-mono-sm text-text-primary">
+<span class="w-1.5 h-1.5 rounded-full bg-warning animate-ping"></span>
+<span class="font-medium tracking-wide">INDEXING</span>
+</span>
+</div>
+<p class="font-body-sm text-body-sm text-text-secondary">
+              Currently chunking and calculating dot products.
+            </p>
+</div>
+<!-- 3. Pending -->
+<div class="rounded-lg bg-bg-base p-space-md flex flex-col justify-between gap-space-sm">
+<span class="font-label-mono-sm text-label-mono-sm text-text-muted">STATE: QUEUED</span>
+<div>
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-container font-label-mono-sm text-label-mono-sm text-text-secondary">
+<span class="w-1.5 h-1.5 rounded-full bg-text-muted"></span>
+<span class="font-medium tracking-wide">PENDING</span>
+</span>
+</div>
+<p class="font-body-sm text-body-sm text-text-secondary">
+              Uploaded artifact awaiting OCR worker allocation.
+            </p>
+</div>
+<!-- 4. Conflict Detected -->
+<div class="rounded-lg bg-bg-base p-space-md flex flex-col justify-between gap-space-sm">
+<span class="font-label-mono-sm text-label-mono-sm text-text-muted">STATE: RESOLVE</span>
+<div>
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-warning/15 font-label-mono-sm text-label-mono-sm text-warning">
+<span class="material-symbols-outlined text-[13px]">warning</span>
+<span class="font-medium tracking-wide">CONFLICT DETECTED</span>
+</span>
+</div>
+<p class="font-body-sm text-body-sm text-text-secondary">
+              Conflicting factual versions require user confirmation.
+            </p>
+</div>
+<!-- 5. Failed with Retry -->
+<div class="rounded-lg bg-bg-base p-space-md flex flex-col justify-between gap-space-sm">
+<span class="font-label-mono-sm text-label-mono-sm text-text-muted">STATE: TERMINAL</span>
+<div class="flex items-center gap-2 flex-wrap">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-accent/15 font-label-mono-sm text-label-mono-sm text-accent">
+<span class="w-1.5 h-1.5 rounded-full bg-accent"></span>
+<span class="font-medium tracking-wide">FAILED</span>
+</span>
+<button class="font-label-mono-sm text-label-mono-sm text-accent hover:underline flex items-center gap-0.5" type="button">
+<span class="">↻ Retry</span>
+</button>
+</div>
+<p class="font-body-sm text-body-sm text-text-secondary">
+              OCR pipeline corrupted. Retry trigger available.
+            </p>
+</div>
+</div>
+</div>
+</section>
+</div>
+</div>
+<script>
+  (() => {
+    // 3-stage animated ticker cycling
+    const stages = [
+      '● SEARCHING YOUR MEMORY... [71.2ms]',
+      '● READING RELEVANT SOURCES... [104.8ms]',
+      '● GROUNDING ANSWER TO EVIDENCE VECTORS... [139.1ms]'
+    ];
+    let currentStage = 0;
+    const tickerEl = document.getElementById('status-ticker');
+    if (tickerEl) {
+      setInterval(() => {
+        currentStage = (currentStage + 1) % stages.length;
+        tickerEl.textContent = stages[currentStage];
+      }, 2400);
+    }
+
+    // Toggle animation pulse for testing
+    let isAnimated = true;
+    const toggleBtn = document.getElementById('toggle-shimmer-btn');
+    if (toggleBtn) {
+      toggleBtn.addEventListener('click', () => {
+        isAnimated = !isAnimated;
+        const pulses = document.querySelectorAll('.animate-pulse');
+        pulses.forEach(el => {
+          if (isAnimated) {
+            el.classList.add('animate-pulse');
+          } else {
+            el.classList.remove('animate-pulse');
+          }
+        });
+      });
+    }
+
+    // Offline banner re-check button mock
+    const retryBtn = document.getElementById('retry-sync-btn');
+    if (retryBtn) {
+      retryBtn.addEventListener('click', () => {
+        retryBtn.classList.add('opacity-50');
+        retryBtn.querySelector('span:last-child').textContent = 'Pinging gateway...';
+        setTimeout(() => {
+          retryBtn.classList.remove('opacity-50');
+          retryBtn.querySelector('span:last-child').textContent = 'Re-check Connection';
+        }, 1200);
+      });
+    }
+  })();
+</script></main></div>
+
+</body></html>

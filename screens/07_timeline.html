@@ -1,0 +1,477 @@
+<!DOCTYPE html><html class="dark" lang="en"><head><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0" name="viewport"><meta content="web_dashboard" name="shell-type"><link href="https://fonts.googleapis.com" rel="preconnect"><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet"><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config={darkMode:"class",theme:{extend:{colors:{"surface-container-low":"#1c1b1c","on-tertiary":"#303035","on-secondary-container":"#b6b4bc","surface":"#131314","on-secondary-fixed":"#1b1b21","on-tertiary-fixed":"#1b1b20","accent-soft":"rgba(239, 68, 68, 0.12)","surface-container-lowest":"#0e0e0f","bg-hover":"#1C1C21","bg-elevated":"#131316","tertiary-fixed":"#e4e1e8","on-background":"#e5e2e3","inverse-primary":"#b91a24","primary-container":"#ff5451","border":"#26262C","error":"#ffb4ab","error-container":"#93000a","border-strong":"#3A3A42","success":"#22C55E","tertiary-fixed-dim":"#c8c5cc","on-tertiary-fixed-variant":"#47464c","on-surface-variant":"#e4beba","on-error":"#690005","secondary":"#c8c5cd","secondary-fixed":"#e4e1e9","surface-dim":"#131314","primary-fixed-dim":"#ffb3ad","text-secondary":"#A1A1AA","tertiary-container":"#919096","on-error-container":"#ffdad6","surface-container-high":"#2a2a2b","on-surface":"#e5e2e3","on-primary-fixed":"#410004","secondary-container":"#46464d","surface-container-highest":"#353436","bg-base":"#0A0A0B","surface-tint":"#ffb3ad","inverse-on-surface":"#313031","primary-fixed":"#ffdad7","on-primary":"#68000a","on-primary-container":"#5c0008","text-primary":"#F4F4F5","background":"#131314","primary":"#ffb3ad","on-secondary-fixed-variant":"#46464d","surface-container":"#201f20","tertiary":"#c8c5cc","on-primary-fixed-variant":"#930013","warning":"#EAB308","on-tertiary-container":"#29292e","inverse-surface":"#e5e2e3","surface-bright":"#3a393a","accent":"#EF4444","outline-variant":"#5b403e","outline":"#ab8986","surface-variant":"#353436","secondary-fixed-dim":"#c8c5cd","text-muted":"#6B6B76","on-secondary":"#303036"},borderRadius:{"DEFAULT":"0.25rem","lg":"0.5rem","xl":"0.75rem","full":"9999px"},spacing:{"space-2xl":"2.5rem","space-3xl":"3rem","space-xl":"2rem","space-xs":"0.5rem","space-md":"1rem","margin-tablet":"1.5rem","margin":"1rem","space-sm":"0.75rem","margin-desktop":"2rem","gutter":"1rem","space-2xs":"0.25rem","gutter-desktop":"1.5rem","space-lg":"1.5rem"},fontFamily:{"headline-lg":["Inter"],"body-sm":["Inter"],"label-mono-sm":["JetBrains Mono"],"headline-sm":["Inter"],"display-hero":["Inter"],"headline-md":["Inter"],"body-lg":["Inter"],"body-md-medium":["Inter"],"body-md":["Inter"],"display-hero-mobile":["Inter"],"label-mono-lg":["JetBrains Mono"],"stat-mono":["JetBrains Mono"]},fontSize:{"headline-lg":["28px",{"lineHeight":"36px","letterSpacing":"-0.02em","fontWeight":"600"}],"body-sm":["13px",{"lineHeight":"20px","fontWeight":"400"}],"label-mono-sm":["11px",{"lineHeight":"16px","letterSpacing":"0.04em","fontWeight":"500"}],"headline-sm":["18px",{"lineHeight":"24px","letterSpacing":"-0.01em","fontWeight":"600"}],"display-hero":["60px",{"lineHeight":"68px","letterSpacing":"-0.03em","fontWeight":"700"}],"headline-md":["22px",{"lineHeight":"28px","letterSpacing":"-0.015em","fontWeight":"600"}],"body-lg":["16px",{"lineHeight":"26px","fontWeight":"400"}],"body-md-medium":["14px",{"lineHeight":"22px","fontWeight":"500"}],"body-md":["14px",{"lineHeight":"22px","fontWeight":"400"}],"display-hero-mobile":["36px",{"lineHeight":"44px","letterSpacing":"-0.025em","fontWeight":"700"}],"label-mono-lg":["13px",{"lineHeight":"18px","letterSpacing":"-0.01em","fontWeight":"500"}],"stat-mono":["32px",{"lineHeight":"38px","letterSpacing":"-0.02em","fontWeight":"600"}]}}}};</script></head><body class="bg-bg-base font-body-md text-text-primary min-h-screen"><aside class="fixed left-0 top-0 h-full w-[240px] bg-bg-elevated z-50 flex flex-col border-r border-border justify-between"><div class="flex flex-col"><div class="h-12 px-space-md flex items-center gap-space-xs border-b border-border"><img alt="Brand logo" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1VpGfiThLWaMOO76r99e6YbUWRnJEOe6YlDPypWtK-Gao8T7h_k7ZPedGLfMS2NsdL6Bo8tb1ep1vNlrOfDP9BBdqlcECMH3wUOdx02ltdkgmSv0FPzA_NQUwLh-7hDdHQapkqWKzZWPuxoytCGBCxYcdAY2kD4Bbopewb8c-j7NSmT5UQwch9CwwLJ6YlBm1umSixQ_AQ4yqTOvDOhywfMtqlMgmNKn4JtZksiMk70HbdwzZV-urmbDBEX"><span class="font-label-mono-lg text-label-mono-lg font-semibold tracking-tight text-text-primary uppercase">MEMORY AI</span></div><nav class="flex flex-col gap-space-2xs px-space-xs py-space-sm" data-active-classes="bg-accent-soft text-text-primary font-medium before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[3px] before:bg-accent before:rounded-full [&gt;span]:text-accent"><a class="relative flex items-center gap-space-sm px-space-sm py-space-xs rounded-lg text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors font-body-md text-body-md" data-path="dashboard" href="#"><span class="material-symbols-outlined text-[18px]">home</span>Home</a><a class="relative flex items-center gap-space-sm px-space-sm py-space-xs rounded-lg text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors font-body-md text-body-md" data-path="ask-memory" href="#"><span class="material-symbols-outlined text-[18px]">chat_bubble</span>Ask Memory</a><a class="relative flex items-center gap-space-sm px-space-sm py-space-xs rounded-lg text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors font-body-md text-body-md" data-path="memories" href="#"><span class="material-symbols-outlined text-[18px]">database</span>Memories</a><a class="relative flex items-center gap-space-sm px-space-sm py-space-xs rounded-lg font-medium transition-colors font-body-md text-body-md bg-accent-soft text-text-primary before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[3px] before:bg-accent before:rounded-full" data-path="timeline" href="#"><span class="material-symbols-outlined text-[18px] text-accent">schedule</span>Timeline</a><a class="relative flex items-center gap-space-sm px-space-sm py-space-xs rounded-lg text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors font-body-md text-body-md" data-path="reminders" href="#"><span class="material-symbols-outlined text-[18px]">notifications</span>Reminders</a><a class="relative flex items-center gap-space-sm px-space-sm py-space-xs rounded-lg text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors font-body-md text-body-md" data-path="settings" href="#"><span class="material-symbols-outlined text-[18px]">settings</span>Settings</a></nav></div><div class="p-space-xs border-t border-border"><div class="flex items-center justify-between p-space-xs rounded-lg hover:bg-bg-hover transition-colors"><div class="flex items-center gap-space-xs min-w-0"><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div><div class="flex flex-col min-w-0"><span class="font-body-md-medium text-body-md-medium text-text-primary truncate">Alex Chen</span><span class="font-label-mono-sm text-label-mono-sm text-text-muted truncate">alex.chen@domain.edu</span></div></div><button class="text-text-muted hover:text-accent transition-colors p-space-2xs flex items-center" title="Sign out" type="button"><span class="material-symbols-outlined text-[18px]">logout</span></button></div></div></aside><div class="pl-[240px]"><header class="fixed top-0 left-[240px] right-0 h-12 bg-bg-elevated/90 backdrop-blur-xl border-b border-border z-40 flex items-center justify-between px-space-lg"><div class="flex items-center gap-space-md"><div class="flex items-center gap-space-xs font-label-mono-sm text-label-mono-sm text-text-muted uppercase tracking-wider"><span class="material-symbols-outlined text-[14px] text-accent">terminal</span><span class="">Workspace</span><span class="text-text-muted">/</span><span class="text-text-secondary">Index Engine</span></div></div><div class="flex items-center gap-space-md"><div class="flex items-center gap-space-xs px-space-sm py-[4px] rounded-full bg-success/10 border border-success/20"><span class="w-1.5 h-1.5 rounded-full bg-success animate-pulse"></span><span class="font-label-mono-sm text-label-mono-sm uppercase text-text-primary font-medium tracking-wide">INDEX SYNCED</span></div><button class="flex items-center gap-space-2xs bg-accent hover:brightness-110 active:scale-95 text-white px-space-md py-1.5 rounded-[10px] font-body-md-medium text-body-md-medium transition-all shadow-[0_0_16px_rgba(239,68,68,0.25)]" type="button"><span class="material-symbols-outlined text-[16px]">add</span><span class="">Add Memory</span></button><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></header><main class="relative pt-12 min-h-screen bg-bg-base"><div class="flex flex-col w-full px-space-lg lg:px-space-2xl py-space-xl max-w-[1240px] mx-auto">
+<!-- Subtle Ambient Glow -->
+<div class="absolute top-0 right-1/4 w-96 h-96 bg-accent/5 rounded-full blur-3xl pointer-events-none -z-10"></div>
+<!-- Header Section -->
+<div class="flex flex-col gap-space-sm mb-space-2xl">
+<div class="flex items-center gap-space-xs font-label-mono-sm text-label-mono-sm text-accent tracking-widest uppercase">
+<span class="inline-block w-1.5 h-1.5 rounded-full bg-accent animate-ping"></span>
+<span class="">CHRONOLOGICAL RECALL // TIME-SERIES INDEX</span>
+</div>
+<div class="flex flex-col lg:flex-row lg:items-end justify-between gap-space-md">
+<div class="flex flex-col gap-space-2xs">
+<h1 class="font-headline-lg text-headline-lg text-text-primary font-semibold tracking-tight">Timeline</h1>
+<p class="font-body-md text-body-md text-text-secondary">
+          Trace memories, ingestion events, and deadlines across temporal milestones.
+        </p>
+</div>
+<!-- Quick Actions: Date Jump & Density Toggle -->
+<div class="flex items-center gap-space-sm shrink-0">
+<!-- Date Selector Dropdown -->
+<div class="relative">
+<button class="flex items-center gap-space-xs px-space-sm py-1.5 rounded-lg bg-bg-elevated text-text-primary border border-border hover:border-border-strong text-body-sm font-label-mono-lg transition-colors" id="yearDropdownBtn" type="button">
+<span class="material-symbols-outlined text-text-muted text-[16px]">calendar_today</span>
+<span class="">2026</span>
+<span class="material-symbols-outlined text-text-muted text-[14px]">expand_more</span>
+</button>
+</div>
+<!-- View Density Toggle -->
+<div class="flex items-center p-0.5 rounded-lg bg-bg-elevated border border-border text-label-mono-sm font-label-mono-sm">
+<button class="px-space-sm py-1 rounded-[6px] text-text-muted hover:text-text-primary transition-all" id="densityCompact" type="button">
+            Compact
+          </button>
+<button class="px-space-sm py-1 rounded-[6px] bg-bg-hover text-text-primary font-medium transition-all shadow-sm" id="densityDetailed" type="button">
+            Detailed
+          </button>
+</div>
+</div>
+</div>
+<!-- Filter Chips Row -->
+<div class="flex flex-wrap items-center gap-space-xs pt-space-xs border-b border-border/40 pb-space-md">
+<button class="filter-chip active flex items-center gap-space-xs px-space-sm py-1 rounded-full bg-accent-soft text-accent border border-accent/30 font-body-sm text-body-sm font-medium transition-all hover:brightness-110" type="button">
+<span class="">All</span>
+<span class="font-label-mono-sm text-[10px] bg-accent/20 px-1.5 py-0.2 rounded-full text-accent">84</span>
+</button>
+<button class="filter-chip flex items-center gap-space-xs px-space-sm py-1 rounded-full bg-bg-elevated text-text-secondary border border-border font-body-sm text-body-sm transition-all hover:text-text-primary hover:border-border-strong" type="button">
+<span class="">College</span>
+<span class="font-label-mono-sm text-[10px] bg-surface-container px-1.5 py-0.2 rounded-full text-text-muted">38</span>
+</button>
+<button class="filter-chip flex items-center gap-space-xs px-space-sm py-1 rounded-full bg-bg-elevated text-text-secondary border border-border font-body-sm text-body-sm transition-all hover:text-text-primary hover:border-border-strong" type="button">
+<span class="">Finance</span>
+<span class="font-label-mono-sm text-[10px] bg-surface-container px-1.5 py-0.2 rounded-full text-text-muted">19</span>
+</button>
+<button class="filter-chip flex items-center gap-space-xs px-space-sm py-1 rounded-full bg-bg-elevated text-text-secondary border border-border font-body-sm text-body-sm transition-all hover:text-text-primary hover:border-border-strong" type="button">
+<span class="">Work</span>
+<span class="font-label-mono-sm text-[10px] bg-surface-container px-1.5 py-0.2 rounded-full text-text-muted">15</span>
+</button>
+<button class="filter-chip flex items-center gap-space-xs px-space-sm py-1 rounded-full bg-bg-elevated text-text-secondary border border-border font-body-sm text-body-sm transition-all hover:text-text-primary hover:border-border-strong" type="button">
+<span class="">Personal</span>
+<span class="font-label-mono-sm text-[10px] bg-surface-container px-1.5 py-0.2 rounded-full text-text-muted">12</span>
+</button>
+<div class="ml-auto flex items-center gap-space-xs text-text-muted font-label-mono-sm text-[11px]">
+<span class="material-symbols-outlined text-[14px]">tune</span>
+<span class="">SORT: NEWEST INGESTION</span>
+</div>
+</div>
+</div>
+<!-- Timeline Core Layout -->
+<div class="relative flex flex-col w-full">
+<!-- Continuous Vertical Backbone Guide Line -->
+<div class="absolute left-[72px] lg:left-[88px] top-6 bottom-16 w-px bg-border z-0"></div>
+<!-- ==================== MONTH 1: OCTOBER 2026 ==================== -->
+<div class="relative z-10 flex flex-col gap-space-lg mb-space-2xl">
+<!-- Month Group Header -->
+<div class="flex items-center gap-space-md">
+<div class="flex items-center justify-center w-[72px] lg:w-[88px] shrink-0">
+<div class="w-3.5 h-3.5 rounded-full bg-bg-base border-2 border-accent flex items-center justify-center">
+<span class="w-1.5 h-1.5 rounded-full bg-accent"></span>
+</div>
+</div>
+<div class="flex items-center gap-space-sm min-w-0 flex-1">
+<span class="font-label-mono-sm text-label-mono-sm text-accent font-semibold tracking-wider uppercase">
+            OCTOBER 2026
+          </span>
+<span class="text-text-muted font-label-mono-sm text-label-mono-sm">—</span>
+<span class="font-label-mono-sm text-label-mono-sm text-text-muted uppercase">14 MEMORIES INDEXED</span>
+<div class="h-px bg-border flex-1 ml-space-xs"></div>
+</div>
+</div>
+<!-- Item 1: CS 402 Exam Syllabus (Milestone with pulse) -->
+<div class="timeline-entry flex items-start gap-space-md group">
+<!-- Date Block Left -->
+<div class="w-[72px] lg:w-[88px] shrink-0 flex flex-col items-center pt-2">
+<span class="font-label-mono-lg text-label-mono-lg font-semibold text-text-primary">18</span>
+<span class="font-label-mono-sm text-[11px] text-accent uppercase font-medium">OCT</span>
+<span class="font-body-sm text-[11px] text-text-muted mt-0.5">Wed</span>
+<!-- Dynamic Marker Dot -->
+<div class="relative mt-3 flex items-center justify-center">
+<span class="absolute -inset-1 rounded-full bg-accent/20 animate-ping"></span>
+<span class="w-2.5 h-2.5 rounded-full bg-accent border-2 border-bg-base relative"></span>
+</div>
+</div>
+<!-- Memory Entry Card -->
+<div class="flex-1 bg-bg-elevated border border-border hover:border-border-strong rounded-xl p-space-lg transition-all duration-150 ease-out hover:-translate-y-0.5 shadow-sm">
+<div class="flex flex-col gap-space-sm">
+<!-- Card Header Meta -->
+<div class="flex flex-wrap items-start justify-between gap-space-xs">
+<div class="flex items-center gap-space-sm min-w-0">
+<div class="w-8 h-8 rounded-lg bg-accent-soft flex items-center justify-center shrink-0 border border-accent/20">
+<span class="material-symbols-outlined text-accent text-[18px]">picture_as_pdf</span>
+</div>
+<div class="flex flex-col min-w-0">
+<h3 class="font-headline-sm text-body-lg font-semibold text-text-primary group-hover:text-accent transition-colors truncate">
+                    Course Syllabus &amp; Exam Schedule (CS 402)
+                  </h3>
+<div class="flex items-center gap-space-xs text-text-muted font-body-sm text-body-sm">
+<span class="">Added via Web Ingest</span>
+<span class="">·</span>
+<span class="font-label-mono-sm text-label-mono-sm">10:41 AM</span>
+</div>
+</div>
+</div>
+<!-- Badges Right -->
+<div class="flex items-center gap-space-xs shrink-0">
+<span class="px-space-xs py-0.5 rounded-full bg-bg-hover border border-border text-text-secondary font-label-mono-sm text-label-mono-sm uppercase">
+                  College
+                </span>
+<span class="px-space-xs py-0.5 rounded-full bg-success/10 border border-success/20 text-success font-label-mono-sm text-label-mono-sm uppercase flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-success"></span>
+                  INDEXED ✓
+                </span>
+</div>
+</div>
+<!-- Snippet Text -->
+<p class="font-body-md text-body-md text-text-secondary line-clamp-2 leading-relaxed">
+              Midterm Examination scheduled for <mark class="bg-accent-soft text-accent px-1 rounded">November 12, 2026</mark> in Turing Hall 304. Coverage includes Graph Partitioning, Vector Cosine Space optimization, and Distributed Cache coherence.
+            </p>
+<!-- Temporal Anchor & Metadata Inset -->
+<div class="flex flex-wrap items-center justify-between gap-space-sm pt-space-xs border-t border-border/50">
+<div class="flex items-center gap-space-sm">
+<div class="flex items-center gap-1.5 px-space-xs py-1 rounded bg-bg-base border border-border font-label-mono-sm text-label-mono-sm text-text-primary">
+<span class="material-symbols-outlined text-accent text-[15px]">event</span>
+<span class="">Target Exam: Nov 12, 2026</span>
+</div>
+<div class="flex items-center gap-1 font-label-mono-sm text-[11px] text-text-muted">
+<span class="material-symbols-outlined text-[13px]">dataset</span>
+<span class="">512 vector dims · 99.4% match</span>
+</div>
+</div>
+<!-- Card Action Triggers -->
+<div class="flex items-center gap-space-xs opacity-80 group-hover:opacity-100 transition-opacity">
+<button class="flex items-center gap-1 px-space-xs py-1 rounded text-text-secondary hover:text-text-primary hover:bg-bg-hover text-body-sm font-label-mono-sm transition-colors" type="button">
+<span class="material-symbols-outlined text-[15px]">visibility</span>
+<span class="">Inspect Source</span>
+</button>
+<button class="flex items-center gap-1 px-space-sm py-1 rounded bg-accent-soft text-accent hover:bg-accent/20 border border-accent/20 text-body-sm font-label-mono-sm transition-colors" type="button">
+<span class="material-symbols-outlined text-[15px]">chat</span>
+<span class="">Ask Memory</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Item 2: Hostel Security Deposit Receipt -->
+<div class="timeline-entry flex items-start gap-space-md group">
+<!-- Date Block Left -->
+<div class="w-[72px] lg:w-[88px] shrink-0 flex flex-col items-center pt-2">
+<span class="font-label-mono-lg text-label-mono-lg font-semibold text-text-primary">14</span>
+<span class="font-label-mono-sm text-[11px] text-accent uppercase font-medium">OCT</span>
+<span class="font-body-sm text-[11px] text-text-muted mt-0.5">Sat</span>
+<!-- Neutral dot -->
+<div class="mt-3 w-2 h-2 rounded-full bg-border-strong border border-bg-base"></div>
+</div>
+<!-- Memory Entry Card -->
+<div class="flex-1 bg-bg-elevated border border-border hover:border-border-strong rounded-xl p-space-lg transition-all duration-150 ease-out hover:-translate-y-0.5 shadow-sm">
+<div class="flex flex-col gap-space-sm">
+<div class="flex flex-wrap items-start justify-between gap-space-xs">
+<div class="flex items-center gap-space-sm min-w-0">
+<div class="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center shrink-0 border border-border">
+<span class="material-symbols-outlined text-text-secondary text-[18px]">receipt_long</span>
+</div>
+<div class="flex flex-col min-w-0">
+<h3 class="font-headline-sm text-body-lg font-semibold text-text-primary group-hover:text-accent transition-colors truncate">
+                    Hostel Security Deposit Receipt (TXN #992841)
+                  </h3>
+<div class="flex items-center gap-space-xs text-text-muted font-body-sm text-body-sm">
+<span class="">Added via OCR Capture</span>
+<span class="">·</span>
+<span class="font-label-mono-sm text-label-mono-sm">04:15 PM</span>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-space-xs shrink-0">
+<span class="px-space-xs py-0.5 rounded-full bg-bg-hover border border-border text-text-secondary font-label-mono-sm text-label-mono-sm uppercase">
+                  Finance
+                </span>
+<span class="px-space-xs py-0.5 rounded-full bg-success/10 border border-success/20 text-success font-label-mono-sm text-label-mono-sm uppercase flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-success"></span>
+                  INDEXED ✓
+                </span>
+</div>
+</div>
+<p class="font-body-md text-body-md text-text-secondary line-clamp-2 leading-relaxed">
+              Paid refundable collateral of <mark class="bg-accent-soft text-accent px-1 rounded">$750.00 USD</mark> to Campus Housing Management. Refund eligible upon inspection after Spring Term check-out.
+            </p>
+<div class="flex flex-wrap items-center justify-between gap-space-sm pt-space-xs border-t border-border/50">
+<div class="flex items-center gap-space-sm">
+<div class="flex items-center gap-1.5 px-space-xs py-1 rounded bg-bg-base border border-border font-label-mono-sm text-label-mono-sm text-text-primary">
+<span class="material-symbols-outlined text-text-muted text-[15px]">tag</span>
+<span class="">OCR: Confirmed Valid Receipt</span>
+</div>
+<div class="flex items-center gap-1 font-label-mono-sm text-[11px] text-text-muted">
+<span class="material-symbols-outlined text-[13px]">lock</span>
+<span class="">Encrypted Zero-Knowledge</span>
+</div>
+</div>
+<div class="flex items-center gap-space-xs opacity-80 group-hover:opacity-100 transition-opacity">
+<button class="flex items-center gap-1 px-space-xs py-1 rounded text-text-secondary hover:text-text-primary hover:bg-bg-hover text-body-sm font-label-mono-sm transition-colors" type="button">
+<span class="material-symbols-outlined text-[15px]">visibility</span>
+<span class="">Inspect Source</span>
+</button>
+<button class="flex items-center gap-1 px-space-sm py-1 rounded bg-accent-soft text-accent hover:bg-accent/20 border border-accent/20 text-body-sm font-label-mono-sm transition-colors" type="button">
+<span class="material-symbols-outlined text-[15px]">chat</span>
+<span class="">Ask Memory</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- ==================== MONTH 2: SEPTEMBER 2026 ==================== -->
+<div class="relative z-10 flex flex-col gap-space-lg mb-space-2xl">
+<!-- Month Group Header -->
+<div class="flex items-center gap-space-md">
+<div class="flex items-center justify-center w-[72px] lg:w-[88px] shrink-0">
+<div class="w-3.5 h-3.5 rounded-full bg-bg-base border-2 border-border-strong flex items-center justify-center">
+<span class="w-1.5 h-1.5 rounded-full bg-text-muted"></span>
+</div>
+</div>
+<div class="flex items-center gap-space-sm min-w-0 flex-1">
+<span class="font-label-mono-sm text-label-mono-sm text-text-secondary font-semibold tracking-wider uppercase">
+            SEPTEMBER 2026
+          </span>
+<span class="text-text-muted font-label-mono-sm text-label-mono-sm">—</span>
+<span class="font-label-mono-sm text-label-mono-sm text-text-muted uppercase">48 MEMORIES INDEXED</span>
+<div class="h-px bg-border flex-1 ml-space-xs"></div>
+</div>
+</div>
+<!-- Item 3: Advisor Thesis Guidance Notes -->
+<div class="timeline-entry flex items-start gap-space-md group">
+<div class="w-[72px] lg:w-[88px] shrink-0 flex flex-col items-center pt-2">
+<span class="font-label-mono-lg text-label-mono-lg font-semibold text-text-primary">28</span>
+<span class="font-label-mono-sm text-[11px] text-text-muted uppercase font-medium">SEP</span>
+<span class="font-body-sm text-[11px] text-text-muted mt-0.5">Thu</span>
+<div class="mt-3 w-2.5 h-2.5 rounded-full bg-accent border-2 border-bg-base"></div>
+</div>
+<div class="flex-1 bg-bg-elevated border border-border hover:border-border-strong rounded-xl p-space-lg transition-all duration-150 ease-out hover:-translate-y-0.5 shadow-sm">
+<div class="flex flex-col gap-space-sm">
+<div class="flex flex-wrap items-start justify-between gap-space-xs">
+<div class="flex items-center gap-space-sm min-w-0">
+<div class="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center shrink-0 border border-border">
+<span class="material-symbols-outlined text-text-secondary text-[18px]">edit_note</span>
+</div>
+<div class="flex flex-col min-w-0">
+<h3 class="font-headline-sm text-body-lg font-semibold text-text-primary group-hover:text-accent transition-colors truncate">
+                    Advisor Thesis Guidance Notes // Dr. Aris Thorne
+                  </h3>
+<div class="flex items-center gap-space-xs text-text-muted font-body-sm text-body-sm">
+<span class="">Added via Audio Transcription</span>
+<span class="">·</span>
+<span class="font-label-mono-sm text-label-mono-sm">02:30 PM</span>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-space-xs shrink-0">
+<span class="px-space-xs py-0.5 rounded-full bg-bg-hover border border-border text-text-secondary font-label-mono-sm text-label-mono-sm uppercase">
+                  College
+                </span>
+<span class="px-space-xs py-0.5 rounded-full bg-success/10 border border-success/20 text-success font-label-mono-sm text-label-mono-sm uppercase flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-success"></span>
+                  INDEXED ✓
+                </span>
+</div>
+</div>
+<p class="font-body-md text-body-md text-text-secondary line-clamp-2 leading-relaxed">
+              Dr. Thorne insisted on benchmark comparisons against <mark class="bg-accent-soft text-accent px-1 rounded">RAG triad metrics</mark> (context relevance, groundedness, and answer relevancy) before the October 30 draft review.
+            </p>
+<div class="flex flex-wrap items-center justify-between gap-space-sm pt-space-xs border-t border-border/50">
+<div class="flex items-center gap-space-sm">
+<div class="flex items-center gap-1.5 px-space-xs py-1 rounded bg-bg-base border border-border font-label-mono-sm text-label-mono-sm text-accent">
+<span class="material-symbols-outlined text-accent text-[15px]">alarm</span>
+<span class="">Deadline: Oct 30, 2026 Draft</span>
+</div>
+<div class="flex items-center gap-1 font-label-mono-sm text-[11px] text-text-muted">
+<span class="material-symbols-outlined text-[13px]">mic</span>
+<span class="">14m Audio Audio Chunk</span>
+</div>
+</div>
+<div class="flex items-center gap-space-xs opacity-80 group-hover:opacity-100 transition-opacity">
+<button class="flex items-center gap-1 px-space-xs py-1 rounded text-text-secondary hover:text-text-primary hover:bg-bg-hover text-body-sm font-label-mono-sm transition-colors" type="button">
+<span class="material-symbols-outlined text-[15px]">visibility</span>
+<span class="">Inspect Source</span>
+</button>
+<button class="flex items-center gap-1 px-space-sm py-1 rounded bg-accent-soft text-accent hover:bg-accent/20 border border-accent/20 text-body-sm font-label-mono-sm transition-colors" type="button">
+<span class="material-symbols-outlined text-[15px]">chat</span>
+<span class="">Ask Memory</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Item 4: DBMS Midterm Preparation Summary -->
+<div class="timeline-entry flex items-start gap-space-md group">
+<div class="w-[72px] lg:w-[88px] shrink-0 flex flex-col items-center pt-2">
+<span class="font-label-mono-lg text-label-mono-lg font-semibold text-text-primary">18</span>
+<span class="font-label-mono-sm text-[11px] text-text-muted uppercase font-medium">SEP</span>
+<span class="font-body-sm text-[11px] text-text-muted mt-0.5">Mon</span>
+<div class="mt-3 w-2 h-2 rounded-full bg-border-strong border border-bg-base"></div>
+</div>
+<div class="flex-1 bg-bg-elevated border border-border hover:border-border-strong rounded-xl p-space-lg transition-all duration-150 ease-out hover:-translate-y-0.5 shadow-sm">
+<div class="flex flex-col gap-space-sm">
+<div class="flex flex-wrap items-start justify-between gap-space-xs">
+<div class="flex items-center gap-space-sm min-w-0">
+<div class="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center shrink-0 border border-border">
+<span class="material-symbols-outlined text-text-secondary text-[18px]">description</span>
+</div>
+<div class="flex flex-col min-w-0">
+<h3 class="font-headline-sm text-body-lg font-semibold text-text-primary group-hover:text-accent transition-colors truncate">
+                    DBMS Midterm Preparation Summary &amp; Indexing Cheatsheet
+                  </h3>
+<div class="flex items-center gap-space-xs text-text-muted font-body-sm text-body-sm">
+<span class="">Added via Markdown Sync</span>
+<span class="">·</span>
+<span class="font-label-mono-sm text-label-mono-sm">09:12 AM</span>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-space-xs shrink-0">
+<span class="px-space-xs py-0.5 rounded-full bg-bg-hover border border-border text-text-secondary font-label-mono-sm text-label-mono-sm uppercase">
+                  College
+                </span>
+<span class="px-space-xs py-0.5 rounded-full bg-success/10 border border-success/20 text-success font-label-mono-sm text-label-mono-sm uppercase flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-success"></span>
+                  INDEXED ✓
+                </span>
+</div>
+</div>
+<p class="font-body-md text-body-md text-text-secondary line-clamp-2 leading-relaxed">
+              Consolidated notes on B+ Trees vs LSM Trees, WAL (Write Ahead Logging), and strict 2PL (Two-Phase Locking) transaction isolation anomalies.
+            </p>
+<div class="flex flex-wrap items-center justify-between gap-space-sm pt-space-xs border-t border-border/50">
+<div class="flex items-center gap-space-sm">
+<div class="flex items-center gap-1.5 px-space-xs py-1 rounded bg-bg-base border border-border font-label-mono-sm text-label-mono-sm text-text-muted">
+<span class="material-symbols-outlined text-text-muted text-[15px]">tag</span>
+<span class="">Topic: Relational Systems</span>
+</div>
+<div class="flex items-center gap-1 font-label-mono-sm text-[11px] text-text-muted">
+<span class="material-symbols-outlined text-[13px]">memory</span>
+<span class="">Gemini-Embedding-001</span>
+</div>
+</div>
+<div class="flex items-center gap-space-xs opacity-80 group-hover:opacity-100 transition-opacity">
+<button class="flex items-center gap-1 px-space-xs py-1 rounded text-text-secondary hover:text-text-primary hover:bg-bg-hover text-body-sm font-label-mono-sm transition-colors" type="button">
+<span class="material-symbols-outlined text-[15px]">visibility</span>
+<span class="">Inspect Source</span>
+</button>
+<button class="flex items-center gap-1 px-space-sm py-1 rounded bg-accent-soft text-accent hover:bg-accent/20 border border-accent/20 text-body-sm font-label-mono-sm transition-colors" type="button">
+<span class="material-symbols-outlined text-[15px]">chat</span>
+<span class="">Ask Memory</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- ==================== AUGUST 2026 & EMPTY / BOUNDARY STATE ==================== -->
+<div class="relative z-10 flex flex-col gap-space-lg mb-space-2xl">
+<!-- Month Group Header -->
+<div class="flex items-center gap-space-md">
+<div class="flex items-center justify-center w-[72px] lg:w-[88px] shrink-0">
+<div class="w-3 h-3 rounded-full bg-bg-base border-2 border-border-strong"></div>
+</div>
+<div class="flex items-center gap-space-sm min-w-0 flex-1">
+<span class="font-label-mono-sm text-label-mono-sm text-text-secondary font-semibold tracking-wider uppercase">
+            AUGUST 2026
+          </span>
+<span class="text-text-muted font-label-mono-sm text-label-mono-sm">—</span>
+<span class="font-label-mono-sm text-label-mono-sm text-text-muted uppercase">22 MEMORIES INDEXED</span>
+<div class="h-px bg-border flex-1 ml-space-xs"></div>
+</div>
+</div>
+<!-- Empty State / Historical Boundary Card -->
+<div class="timeline-entry flex items-start gap-space-md">
+<div class="w-[72px] lg:w-[88px] shrink-0 flex flex-col items-center pt-6">
+<div class="w-2 h-2 rounded-full bg-border"></div>
+</div>
+<div class="flex-1 bg-bg-elevated/40 border border-border border-dashed rounded-xl p-space-xl text-center flex flex-col items-center justify-center gap-space-md">
+<!-- 40px line icon inside 64px circle per spec -->
+<div class="w-16 h-16 rounded-full bg-surface-container flex items-center justify-center border border-border">
+<span class="material-symbols-outlined text-text-muted text-[40px]">history</span>
+</div>
+<div class="flex flex-col gap-space-2xs max-w-md">
+<h4 class="font-headline-sm text-headline-sm text-text-primary">Historical Horizon Reached</h4>
+<p class="font-body-md text-body-md text-text-secondary">
+              No further memories indexed prior to August 2026. Query your cold storage backups or ingest archive zip bundles to extend your timeline.
+            </p>
+</div>
+<div class="flex items-center gap-space-sm pt-space-xs">
+<button class="flex items-center gap-space-xs px-space-md py-2 rounded-lg bg-bg-hover hover:bg-border-strong border border-border text-text-primary text-body-sm font-label-mono-lg transition-colors" type="button">
+<span class="material-symbols-outlined text-[16px]">file_upload</span>
+<span class="">Upload Archive (.zip / .mbox)</span>
+</button>
+<button class="flex items-center gap-space-xs px-space-md py-2 rounded-lg bg-accent text-white font-body-md-medium text-body-sm hover:brightness-110 active:scale-95 transition-all shadow-[0_0_12px_rgba(239,68,68,0.25)]" type="button">
+<span class="material-symbols-outlined text-[16px]">travel_explore</span>
+<span class="">Search All Storage</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<script>
+  // Filter chips micro-interaction
+  document.querySelectorAll('.filter-chip').forEach(button => {
+    button.addEventListener('click', () => {
+      document.querySelectorAll('.filter-chip').forEach(btn => {
+        btn.classList.remove('active', 'bg-accent-soft', 'text-accent', 'border-accent/30');
+        btn.classList.add('bg-bg-elevated', 'text-text-secondary', 'border-border');
+        const badge = btn.querySelector('span:last-child');
+        if (badge) {
+          badge.classList.remove('bg-accent/20', 'text-accent');
+          badge.classList.add('bg-surface-container', 'text-text-muted');
+        }
+      });
+
+      button.classList.add('active', 'bg-accent-soft', 'text-accent', 'border-accent/30');
+      button.classList.remove('bg-bg-elevated', 'text-text-secondary', 'border-border');
+      const badge = button.querySelector('span:last-child');
+      if (badge) {
+        badge.classList.add('bg-accent/20', 'text-accent');
+        badge.classList.remove('bg-surface-container', 'text-text-muted');
+      }
+    });
+  });
+
+  // Density toggle micro-interaction
+  const densityCompact = document.getElementById('densityCompact');
+  const densityDetailed = document.getElementById('densityDetailed');
+  const entries = document.querySelectorAll('.timeline-entry p');
+
+  if (densityCompact && densityDetailed) {
+    densityCompact.addEventListener('click', () => {
+      densityCompact.classList.add('bg-bg-hover', 'text-text-primary', 'shadow-sm');
+      densityCompact.classList.remove('text-text-muted');
+      densityDetailed.classList.remove('bg-bg-hover', 'text-text-primary', 'shadow-sm');
+      densityDetailed.classList.add('text-text-muted');
+
+      entries.forEach(snippet => snippet.classList.add('hidden'));
+    });
+
+    densityDetailed.addEventListener('click', () => {
+      densityDetailed.classList.add('bg-bg-hover', 'text-text-primary', 'shadow-sm');
+      densityDetailed.classList.remove('text-text-muted');
+      densityCompact.classList.remove('bg-bg-hover', 'text-text-primary', 'shadow-sm');
+      densityCompact.classList.add('text-text-muted');
+
+      entries.forEach(snippet => snippet.classList.remove('hidden'));
+    });
+  }
+</script></main></div>
+
+</body></html>

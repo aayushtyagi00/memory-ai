@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_dashboard" name="shell-type"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config={darkMode:"class",theme:{extend:{colors:{"surface-container-low":"#1c1b1c","on-tertiary":"#303035","on-secondary-container":"#b6b4bc","surface":"#131314","on-secondary-fixed":"#1b1b21","on-tertiary-fixed":"#1b1b20","accent-soft":"rgba(239, 68, 68, 0.12)","surface-container-lowest":"#0e0e0f","bg-hover":"#1C1C21","bg-elevated":"#131316","tertiary-fixed":"#e4e1e8","on-background":"#e5e2e3","inverse-primary":"#b91a24","primary-container":"#ff5451","border":"#26262C","error":"#ffb4ab","error-container":"#93000a","border-strong":"#3A3A42","success":"#22C55E","tertiary-fixed-dim":"#c8c5cc","on-tertiary-fixed-variant":"#47464c","on-surface-variant":"#e4beba","on-error":"#690005","secondary":"#c8c5cd","secondary-fixed":"#e4e1e9","surface-dim":"#131314","primary-fixed-dim":"#ffb3ad","text-secondary":"#A1A1AA","tertiary-container":"#919096","on-error-container":"#ffdad6","surface-container-high":"#2a2a2b","on-surface":"#e5e2e3","on-primary-fixed":"#410004","secondary-container":"#46464d","surface-container-highest":"#353436","bg-base":"#0A0A0B","surface-tint":"#ffb3ad","inverse-on-surface":"#313031","primary-fixed":"#ffdad7","on-primary":"#68000a","on-primary-container":"#5c0008","text-primary":"#F4F4F5","background":"#131314","primary":"#ffb3ad","on-secondary-fixed-variant":"#46464d","surface-container":"#201f20","tertiary":"#c8c5cc","on-primary-fixed-variant":"#930013","warning":"#EAB308","on-tertiary-container":"#29292e","inverse-surface":"#e5e2e3","surface-bright":"#3a393a","accent":"#EF4444","outline-variant":"#5b403e","outline":"#ab8986","surface-variant":"#353436","secondary-fixed-dim":"#c8c5cd","text-muted":"#6B6B76","on-secondary":"#303036"},borderRadius:{"DEFAULT":"0.25rem","lg":"0.5rem","xl":"0.75rem","full":"9999px"},spacing:{"space-2xl":"2.5rem","space-3xl":"3rem","space-xl":"2rem","space-xs":"0.5rem","space-md":"1rem","margin-tablet":"1.5rem","margin":"1rem","space-sm":"0.75rem","margin-desktop":"2rem","gutter":"1rem","space-2xs":"0.25rem","gutter-desktop":"1.5rem","space-lg":"1.5rem"},fontFamily:{"headline-lg":["Inter"],"body-sm":["Inter"],"label-mono-sm":["JetBrains Mono"],"headline-sm":["Inter"],"display-hero":["Inter"],"headline-md":["Inter"],"body-lg":["Inter"],"body-md-medium":["Inter"],"body-md":["Inter"],"display-hero-mobile":["Inter"],"label-mono-lg":["JetBrains Mono"],"stat-mono":["JetBrains Mono"]},fontSize:{"headline-lg":["28px",{"lineHeight":"36px","letterSpacing":"-0.02em","fontWeight":"600"}],"body-sm":["13px",{"lineHeight":"20px","fontWeight":"400"}],"label-mono-sm":["11px",{"lineHeight":"16px","letterSpacing":"0.04em","fontWeight":"500"}],"headline-sm":["18px",{"lineHeight":"24px","letterSpacing":"-0.01em","fontWeight":"600"}],"display-hero":["60px",{"lineHeight":"68px","letterSpacing":"-0.03em","fontWeight":"700"}],"headline-md":["22px",{"lineHeight":"28px","letterSpacing":"-0.015em","fontWeight":"600"}],"body-lg":["16px",{"lineHeight":"26px","fontWeight":"400"}],"body-md-medium":["14px",{"lineHeight":"22px","fontWeight":"500"}],"body-md":["14px",{"lineHeight":"22px","fontWeight":"400"}],"display-hero-mobile":["36px",{"lineHeight":"44px","letterSpacing":"-0.025em","fontWeight":"700"}],"label-mono-lg":["13px",{"lineHeight":"18px","letterSpacing":"-0.01em","fontWeight":"500"}],"stat-mono":["32px",{"lineHeight":"38px","letterSpacing":"-0.02em","fontWeight":"600"}]}}}};</script></head><body class="bg-bg-base font-body-md text-text-primary min-h-screen"><aside class="fixed left-0 top-0 h-full w-[240px] bg-bg-elevated z-50 flex flex-col border-r border-border justify-between"><div class="flex flex-col"><div class="h-12 px-space-md flex items-center gap-space-xs border-b border-border"><img alt="Brand logo" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1VpGfiThLWaMOO76r99e6YbUWRnJEOe6YlDPypWtK-Gao8T7h_k7ZPedGLfMS2NsdL6Bo8tb1ep1vNlrOfDP9BBdqlcECMH3wUOdx02ltdkgmSv0FPzA_NQUwLh-7hDdHQapkqWKzZWPuxoytCGBCxYcdAY2kD4Bbopewb8c-j7NSmT5UQwch9CwwLJ6YlBm1umSixQ_AQ4yqTOvDOhywfMtqlMgmNKn4JtZksiMk70HbdwzZV-urmbDBEX"/><span class="font-label-mono-lg text-label-mono-lg font-semibold tracking-tight text-text-primary uppercase">MEMORY AI</span></div><nav class="flex flex-col gap-space-2xs px-space-xs py-space-sm" data-active-classes="bg-accent-soft text-text-primary font-medium before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[3px] before:bg-accent before:rounded-full [&gt;span]:text-accent"><a class="relative flex items-center gap-space-sm px-space-sm py-space-xs rounded-lg text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors font-body-md text-body-md" data-path="dashboard" href="#"><span class="material-symbols-outlined text-[18px]">home</span>Home</a><a class="relative flex items-center gap-space-sm px-space-sm py-space-xs rounded-lg text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors font-body-md text-body-md" data-path="ask-memory" href="#"><span class="material-symbols-outlined text-[18px]">chat_bubble</span>Ask Memory</a><a class="relative flex items-center gap-space-sm px-space-sm py-space-xs rounded-lg text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors font-body-md text-body-md" data-path="memories" href="#"><span class="material-symbols-outlined text-[18px]">database</span>Memories</a><a class="relative flex items-center gap-space-sm px-space-sm py-space-xs rounded-lg text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors font-body-md text-body-md" data-path="timeline" href="#"><span class="material-symbols-outlined text-[18px]">schedule</span>Timeline</a><a class="relative flex items-center gap-space-sm px-space-sm py-space-xs rounded-lg font-medium transition-colors font-body-md text-body-md bg-accent-soft text-text-primary before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[3px] before:bg-accent before:rounded-full" data-path="reminders" href="#"><span class="material-symbols-outlined text-[18px] text-accent">notifications</span>Reminders</a><a class="relative flex items-center gap-space-sm px-space-sm py-space-xs rounded-lg text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors font-body-md text-body-md" data-path="settings" href="#"><span class="material-symbols-outlined text-[18px]">settings</span>Settings</a></nav></div><div class="p-space-xs border-t border-border"><div class="flex items-center justify-between p-space-xs rounded-lg hover:bg-bg-hover transition-colors"><div class="flex items-center gap-space-xs min-w-0"><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div><div class="flex flex-col min-w-0"><span class="font-body-md-medium text-body-md-medium text-text-primary truncate">Alex Chen</span><span class="font-label-mono-sm text-label-mono-sm text-text-muted truncate">alex.chen@domain.edu</span></div></div><button class="text-text-muted hover:text-accent transition-colors p-space-2xs flex items-center" title="Sign out" type="button"><span class="material-symbols-outlined text-[18px]">logout</span></button></div></div></aside><div class="pl-[240px]"><header class="fixed top-0 left-[240px] right-0 h-12 bg-bg-elevated/90 backdrop-blur-xl border-b border-border z-40 flex items-center justify-between px-space-lg"><div class="flex items-center gap-space-md"><div class="flex items-center gap-space-xs font-label-mono-sm text-label-mono-sm uppercase tracking-wider"><span class="material-symbols-outlined text-[14px] text-accent">notifications</span><span class="text-text-primary font-medium">Reminders</span><span class="text-text-muted">/</span><span class="text-text-secondary">Schedule &amp; Triggers</span></div></div><div class="flex items-center gap-space-md"><div class="flex items-center gap-space-xs px-space-sm py-[4px] rounded-full bg-success/10 border border-success/20"><span class="w-1.5 h-1.5 rounded-full bg-success animate-pulse"></span><span class="font-label-mono-sm text-label-mono-sm uppercase text-text-primary font-medium tracking-wide">● INDEX SYNCED</span></div><button class="flex items-center gap-space-2xs bg-accent hover:brightness-110 active:scale-95 text-white px-space-md py-1.5 rounded-[10px] font-body-md-medium text-body-md-medium transition-all shadow-[0_0_16px_rgba(239,68,68,0.25)]" type="button"><span class="material-symbols-outlined text-[16px]">add</span><span>+ Add Memory</span></button><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></header><main class="relative pt-12 min-h-screen bg-bg-base"><div class="flex flex-col w-full">
+<div class="max-w-[1200px] mx-auto w-full px-space-md md:px-space-xl py-space-xl flex flex-col gap-space-xl">
+<!-- Top Header / Meta Toolbar -->
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-space-md pb-space-lg border-b border-border">
+<div class="flex flex-col gap-space-2xs">
+<div class="flex items-center gap-space-xs font-label-mono-sm text-label-mono-sm uppercase text-accent tracking-widest">
+<span class="inline-block w-1.5 h-1.5 rounded-full bg-accent animate-pulse"></span>
+<span>SYSTEM &amp; PREFERENCES // ACCOUNT CONTROLS</span>
+</div>
+<h1 class="font-headline-lg text-headline-lg text-text-primary tracking-tight">Settings</h1>
+<p class="font-body-md text-body-md text-text-secondary">
+          Manage profile attributes, storage quotas, neural model parameters, and cryptographic access.
+        </p>
+</div>
+<div class="flex items-center gap-space-sm shrink-0">
+<div class="flex items-center gap-space-2xs px-space-sm py-1.5 rounded-full bg-success/10 border border-success/20 font-label-mono-sm text-label-mono-sm text-success">
+<span class="material-symbols-outlined text-[14px]">check_circle</span>
+<span>Saved Changes ✓</span>
+</div>
+<button class="flex items-center gap-space-2xs bg-bg-elevated hover:bg-bg-hover text-text-primary px-space-md py-1.5 rounded-lg border border-border hover:border-border-strong font-body-md-medium text-body-md-medium transition-all" type="button">
+<span class="material-symbols-outlined text-[16px] text-text-muted">menu_book</span>
+<span>Documentation</span>
+</button>
+</div>
+</div>
+<!-- Main Settings Bento Feed -->
+<div class="flex flex-col gap-[28px]">
+<!-- Section 1: User Profile -->
+<section class="bg-bg-elevated rounded-xl p-space-xl border border-border shadow-sm flex flex-col gap-space-lg">
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-space-xs pb-space-md border-b border-border">
+<div class="flex items-center gap-space-sm">
+<div class="w-8 h-8 rounded-lg bg-accent-soft flex items-center justify-center text-accent">
+<span class="material-symbols-outlined text-[20px]">person</span>
+</div>
+<div>
+<h2 class="font-headline-sm text-headline-sm text-text-primary">User Profile</h2>
+<p class="font-body-sm text-body-sm text-text-muted">Personal identifiers and account credentials.</p>
+</div>
+</div>
+<div class="inline-flex items-center gap-space-2xs px-space-sm py-1 rounded-full bg-surface-container border border-border-strong font-label-mono-sm text-label-mono-sm text-text-secondary">
+<span class="w-1.5 h-1.5 rounded-full bg-accent"></span>
+<span>Stanford University · Academic Pro Tier</span>
+</div>
+</div>
+<div class="flex flex-col lg:flex-row items-start gap-space-xl">
+<!-- Avatar Block -->
+<div class="flex flex-col items-center gap-space-sm shrink-0 self-center lg:self-start">
+<div class="relative">
+<div class="w-14 h-14 rounded-full bg-surface-container-high border border-accent/40 flex items-center justify-center text-text-primary font-headline-sm text-headline-sm font-semibold shadow-[0_0_16px_rgba(239,68,68,0.15)]">
+                AC
+              </div>
+<div class="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-bg-elevated border border-border flex items-center justify-center text-accent" title="Verified Pro User">
+<span class="material-symbols-outlined text-[13px]">verified</span>
+</div>
+</div>
+<button class="bg-bg-base hover:bg-bg-hover text-text-secondary hover:text-text-primary px-space-sm py-1 rounded-lg border border-border hover:border-border-strong font-body-sm text-body-sm transition-colors" type="button">
+              Change Avatar
+            </button>
+</div>
+<!-- Form Fields Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-space-md w-full">
+<!-- Full Name (Read-only) -->
+<div class="flex flex-col gap-space-2xs">
+<label class="font-label-mono-sm text-label-mono-sm uppercase text-text-muted flex items-center justify-between">
+<span>Account Legal Name</span>
+<span class="flex items-center gap-1 text-text-muted lowercase font-normal"><span class="material-symbols-outlined text-[12px]">lock</span> locked</span>
+</label>
+<div class="flex items-center justify-between px-space-md py-2.5 rounded-lg bg-bg-base border border-border text-text-muted font-body-md text-body-md cursor-not-allowed">
+<span>Alex Chen</span>
+<span class="font-label-mono-sm text-label-mono-sm uppercase tracking-wider text-text-muted bg-surface-container px-space-2xs py-0.5 rounded">SSO Sync</span>
+</div>
+</div>
+<!-- Email Address (Read-only with badge) -->
+<div class="flex flex-col gap-space-2xs">
+<label class="font-label-mono-sm text-label-mono-sm uppercase text-text-muted flex items-center justify-between">
+<span>Primary Email Identity</span>
+<span class="text-success font-label-mono-sm text-label-mono-sm flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px]">verified_user</span> Verified Account
+                </span>
+</label>
+<div class="flex items-center justify-between px-space-md py-2.5 rounded-lg bg-bg-base border border-border text-text-secondary font-label-mono-lg text-label-mono-lg cursor-not-allowed">
+<span class="truncate">alex.chen@domain.edu</span>
+<span class="material-symbols-outlined text-[16px] text-text-muted">lock</span>
+</div>
+</div>
+<!-- Editable Display Name -->
+<div class="flex flex-col gap-space-2xs md:col-span-2">
+<label class="font-label-mono-sm text-label-mono-sm uppercase text-text-muted" for="display-name-input">
+                Display Name (Inference &amp; Index Metadata)
+              </label>
+<div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-space-xs">
+<div class="relative flex-1">
+<input class="w-full bg-bg-base border border-border rounded-lg px-space-md py-2 text-text-primary placeholder:text-text-muted font-body-md text-body-md focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all" id="display-name-input" placeholder="Enter display name..." type="text" value="Alex Chen (Research)"/>
+</div>
+<button class="bg-accent hover:brightness-110 active:scale-95 text-white px-space-md py-2 rounded-lg font-body-md-medium text-body-md-medium transition-all shadow-[0_0_12px_rgba(239,68,68,0.2)] shrink-0" type="button">
+                  Save Changes
+                </button>
+</div>
+<p class="font-label-mono-sm text-label-mono-sm text-text-muted">Used when cross-referencing author attribution during memory synthesis queries.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Section 2: Memory Storage Section Card -->
+<section class="bg-bg-elevated rounded-xl p-space-xl border border-border shadow-sm flex flex-col gap-space-lg">
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-space-xs pb-space-md border-b border-border">
+<div class="flex items-center gap-space-sm">
+<div class="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center text-text-secondary">
+<span class="material-symbols-outlined text-[20px]">database</span>
+</div>
+<div>
+<h2 class="font-headline-sm text-headline-sm text-text-primary">Memory Storage &amp; Allocation</h2>
+<p class="font-body-sm text-body-sm text-text-muted">Ingested documents, notes, and vector representations indexed in your private memory pool.</p>
+</div>
+</div>
+<button class="flex items-center gap-space-2xs bg-bg-base hover:bg-bg-hover text-text-primary px-space-md py-1.5 rounded-lg border border-border hover:border-border-strong font-body-md-medium text-body-md-medium transition-colors shrink-0" type="button">
+<span class="material-symbols-outlined text-[16px] text-text-muted">download</span>
+<span>Export Memory Archive (.json / .zip)</span>
+</button>
+</div>
+<!-- 4 Mono Stat Blocks -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-space-md">
+<!-- Stat 1: Total Ingested -->
+<div class="bg-bg-base p-space-md rounded-lg border border-border flex flex-col justify-between gap-space-xs">
+<div class="flex items-center justify-between">
+<span class="font-label-mono-sm text-label-mono-sm uppercase text-text-muted">Total Ingested</span>
+<span class="material-symbols-outlined text-[16px] text-accent">storage</span>
+</div>
+<div class="font-stat-mono text-stat-mono text-text-primary">142</div>
+<div class="flex flex-col gap-1">
+<div class="flex items-center justify-between font-label-mono-sm text-label-mono-sm text-text-muted">
+<span>Usage</span>
+<span class="text-accent font-semibold">11.7%</span>
+</div>
+<div class="w-full bg-surface-container h-1.5 rounded-full overflow-hidden">
+<div class="bg-accent h-full w-[11.7%] rounded-full"></div>
+</div>
+<span class="font-label-mono-sm text-label-mono-sm text-text-muted">58.4 MB of 500 MB</span>
+</div>
+</div>
+<!-- Stat 2: Documents -->
+<div class="bg-bg-base p-space-md rounded-lg border border-border flex flex-col justify-between gap-space-xs">
+<div class="flex items-center justify-between">
+<span class="font-label-mono-sm text-label-mono-sm uppercase text-text-muted">Documents</span>
+<span class="w-2 h-2 rounded-full bg-accent"></span>
+</div>
+<div class="font-stat-mono text-stat-mono text-text-primary">86</div>
+<div class="flex flex-col gap-0.5">
+<span class="font-label-mono-lg text-label-mono-lg text-text-primary">41.2 MB</span>
+<span class="font-label-mono-sm text-label-mono-sm text-text-muted">60.5% (PDF, DOCX)</span>
+</div>
+</div>
+<!-- Stat 3: Notes -->
+<div class="bg-bg-base p-space-md rounded-lg border border-border flex flex-col justify-between gap-space-xs">
+<div class="flex items-center justify-between">
+<span class="font-label-mono-sm text-label-mono-sm uppercase text-text-muted">Notes</span>
+<span class="w-2 h-2 rounded-full bg-text-primary"></span>
+</div>
+<div class="font-stat-mono text-stat-mono text-text-primary">38</div>
+<div class="flex flex-col gap-0.5">
+<span class="font-label-mono-lg text-label-mono-lg text-text-primary">6.4 MB</span>
+<span class="font-label-mono-sm text-label-mono-sm text-text-muted">26.8% (Markdown, TXT)</span>
+</div>
+</div>
+<!-- Stat 4: Images -->
+<div class="bg-bg-base p-space-md rounded-lg border border-border flex flex-col justify-between gap-space-xs">
+<div class="flex items-center justify-between">
+<span class="font-label-mono-sm text-label-mono-sm uppercase text-text-muted">Images</span>
+<span class="w-2 h-2 rounded-full bg-warning"></span>
+</div>
+<div class="font-stat-mono text-stat-mono text-text-primary">18</div>
+<div class="flex flex-col gap-0.5">
+<span class="font-label-mono-lg text-label-mono-lg text-text-primary">10.8 MB</span>
+<span class="font-label-mono-sm text-label-mono-sm text-text-muted">12.7% (OCR PNG/JPG)</span>
+</div>
+</div>
+</div>
+<!-- Segmented Storage Visual Bar -->
+<div class="flex flex-col gap-space-xs bg-bg-base p-space-md rounded-lg border border-border">
+<div class="flex items-center justify-between font-label-mono-sm text-label-mono-sm text-text-muted mb-1">
+<span>Pool Allocation Distribution</span>
+<span>441.6 MB Available</span>
+</div>
+<!-- Segment bar -->
+<div class="w-full h-3 rounded-full overflow-hidden flex bg-surface-container p-0.5 gap-0.5">
+<div class="bg-accent h-full rounded-l-full" style="width: 7.07%;" title="Documents: 41.2 MB"></div>
+<div class="bg-text-primary h-full" style="width: 1.1%;" title="Notes: 6.4 MB"></div>
+<div class="bg-warning h-full" style="width: 1.85%;" title="Images: 10.8 MB"></div>
+<div class="bg-transparent h-full flex-1 rounded-r-full" title="Free: 441.6 MB"></div>
+</div>
+<!-- Legend -->
+<div class="flex flex-wrap items-center gap-space-md pt-space-xs font-label-mono-sm text-label-mono-sm">
+<div class="flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-accent"></span>
+<span class="text-text-secondary">Documents (70.5%)</span>
+</div>
+<div class="flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-text-primary"></span>
+<span class="text-text-secondary">Notes (11.0%)</span>
+</div>
+<div class="flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-warning"></span>
+<span class="text-text-secondary">Images &amp; OCR (18.5%)</span>
+</div>
+<div class="flex items-center gap-1.5 ml-auto">
+<span class="w-2 h-2 rounded-full bg-surface-container-highest"></span>
+<span class="text-text-muted">Unallocated (88.3%)</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Section 3: Neural Retrieval & Inference Engine -->
+<section class="bg-bg-elevated rounded-xl p-space-xl border border-border shadow-sm flex flex-col gap-space-lg">
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-space-xs pb-space-md border-b border-border">
+<div class="flex items-center gap-space-sm">
+<div class="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center text-text-secondary">
+<span class="material-symbols-outlined text-[20px]">psychology</span>
+</div>
+<div>
+<h2 class="font-headline-sm text-headline-sm text-text-primary">Neural Retrieval &amp; Inference Engine</h2>
+<p class="font-body-sm text-body-sm text-text-muted">Active LLM models and vector search embeddings powering personal recall.</p>
+</div>
+</div>
+<div class="flex items-center gap-space-2xs px-space-sm py-1 rounded-full bg-bg-base border border-border font-label-mono-sm text-label-mono-sm text-text-secondary">
+<span class="material-symbols-outlined text-[14px] text-accent">speed</span>
+<span>Avg Retrieval Latency: <strong class="text-text-primary font-semibold">142ms</strong></span>
+</div>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-space-md">
+<!-- Active Model Details -->
+<div class="lg:col-span-2 bg-bg-base p-space-md rounded-lg border border-border flex flex-col gap-space-md justify-between">
+<div class="flex flex-col gap-space-xs">
+<div class="flex items-center justify-between">
+<span class="font-label-mono-sm text-label-mono-sm uppercase text-text-muted">Core Foundation Model</span>
+<span class="inline-flex items-center gap-1.5 px-space-xs py-0.5 rounded-full bg-success/10 border border-success/20 font-label-mono-sm text-label-mono-sm text-success">
+<span class="w-1.5 h-1.5 rounded-full bg-success animate-pulse"></span> ACTIVE DEPLOYMENT
+                </span>
+</div>
+<div class="font-label-mono-lg text-label-mono-lg font-semibold text-text-primary flex items-center gap-2">
+<span>Model: gemini-3.8-flash</span>
+</div>
+</div>
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-space-sm pt-space-xs border-t border-border">
+<div class="flex flex-col gap-0.5">
+<span class="font-label-mono-sm text-label-mono-sm uppercase text-text-muted">Context Window</span>
+<span class="font-label-mono-sm text-label-mono-sm text-text-primary font-medium">1,000,000 tokens</span>
+</div>
+<div class="flex flex-col gap-0.5">
+<span class="font-label-mono-sm text-label-mono-sm uppercase text-text-muted">Embedding Dimension</span>
+<span class="font-label-mono-sm text-label-mono-sm text-text-primary font-medium">text-embedding-004 (1536)</span>
+</div>
+<div class="flex flex-col gap-0.5">
+<span class="font-label-mono-sm text-label-mono-sm uppercase text-text-muted">Grounding Protocol</span>
+<span class="font-label-mono-sm text-label-mono-sm text-text-primary font-medium">Gemini File Search API</span>
+</div>
+</div>
+</div>
+<!-- Inference Mode Config -->
+<div class="bg-bg-base p-space-md rounded-lg border border-border flex flex-col justify-between gap-space-md">
+<div class="flex flex-col gap-space-xs">
+<span class="font-label-mono-sm text-label-mono-sm uppercase text-text-muted">Grounding Policy</span>
+<div class="flex items-start gap-space-xs">
+<div class="pt-0.5">
+<input checked="" class="w-4 h-4 rounded border-border-strong text-accent accent-accent cursor-not-allowed" disabled="" type="checkbox"/>
+</div>
+<div class="flex flex-col">
+<span class="font-body-md-medium text-body-md-medium text-text-primary">Strict Grounding</span>
+<span class="font-body-sm text-body-sm text-text-muted">Deterministic evidence only. Hallucination suppression active.</span>
+</div>
+</div>
+</div>
+<div class="bg-surface-container px-space-sm py-1.5 rounded border border-border flex items-center gap-space-2xs font-label-mono-sm text-label-mono-sm text-text-muted">
+<span class="material-symbols-outlined text-[14px]">shield</span>
+<span>Policy enforced by Stanford Academic Tier</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Section 4: Privacy & Data Governance Card -->
+<section class="bg-bg-elevated rounded-xl p-space-xl border border-border shadow-sm flex flex-col gap-space-lg">
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-space-xs pb-space-md border-b border-border">
+<div class="flex items-center gap-space-sm">
+<div class="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center text-accent">
+<span class="material-symbols-outlined text-[20px]">security</span>
+</div>
+<div>
+<h2 class="font-headline-sm text-headline-sm text-text-primary">Privacy &amp; Data Governance</h2>
+<p class="font-body-sm text-body-sm text-text-muted">Cryptographic safeguards, model isolation, and immediate retention purge.</p>
+</div>
+</div>
+<div class="flex items-center gap-1.5 font-label-mono-sm text-label-mono-sm text-text-muted">
+<span class="material-symbols-outlined text-[14px] text-success">lock</span>
+<span>AES-256 ZERO KNOWLEDGE</span>
+</div>
+</div>
+<div class="p-space-md rounded-lg bg-bg-base border border-border text-text-secondary font-body-md text-body-md flex flex-col md:flex-row items-start md:items-center gap-space-md">
+<div class="w-10 h-10 rounded-lg bg-surface-container shrink-0 flex items-center justify-center text-text-primary">
+<span class="material-symbols-outlined text-[22px]">privacy_tip</span>
+</div>
+<p class="flex-1">
+            Your memories are private, zero-knowledge encrypted at rest (AES-256), and never used to train global foundation models. All vector searches execute inside ephemeral, stateless workers.
+          </p>
+</div>
+<!-- Destructive Action Box -->
+<div class="rounded-lg border border-accent/30 bg-accent/5 p-space-md flex flex-col md:flex-row items-start md:items-center justify-between gap-space-md">
+<div class="flex flex-col gap-0.5">
+<span class="font-headline-sm text-headline-sm text-accent font-semibold">Delete all memories</span>
+<p class="font-body-sm text-body-sm text-text-muted">
+              Permanently purges all 142 indexed files, extracted notes, vector embeddings, and citation graphs. This action is irreversible.
+            </p>
+</div>
+<button class="border border-accent text-accent hover:bg-accent hover:text-white px-space-md py-2 rounded-lg font-body-md-medium text-body-md-medium transition-all shrink-0" id="trigger-purge-btn" type="button">
+            Purge All Memories...
+          </button>
+</div>
+<!-- Embedded Interactive Preview: Confirmation Dialog -->
+<div class="flex flex-col gap-space-xs mt-space-xs">
+<div class="flex items-center justify-between">
+<span class="font-label-mono-sm text-label-mono-sm uppercase text-text-muted">Interactive Dialog Component Reference (§3 Screen 10)</span>
+<span class="font-label-mono-sm text-label-mono-sm text-accent">CONFIRMATION STATE</span>
+</div>
+<div class="p-space-xl rounded-xl bg-bg-base border border-border-strong flex items-center justify-center relative overflow-hidden">
+<!-- Subtle Radial Gradient Backing -->
+<div class="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(239,68,68,0.06)_0%,transparent_70%)] pointer-events-none"></div>
+<!-- The Confirmation Dialog Card -->
+<div class="relative w-full max-w-lg bg-bg-elevated border border-border-strong rounded-xl p-space-lg shadow-xl flex flex-col gap-space-md">
+<div class="flex items-start gap-space-md">
+<div class="w-10 h-10 rounded-full bg-accent-soft text-accent flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[22px]">warning</span>
+</div>
+<div class="flex flex-col gap-space-2xs">
+<h3 class="font-headline-sm text-headline-sm text-text-primary">Delete all memories?</h3>
+<p class="font-body-md text-body-md text-text-secondary">
+                    This permanently removes your uploaded information from this account. Ingestion indexes and evidence citations will cease to exist immediately.
+                  </p>
+</div>
+</div>
+<div class="flex items-center justify-end gap-space-sm pt-space-xs border-t border-border">
+<button class="bg-bg-elevated hover:bg-bg-hover text-text-primary px-space-md py-2 rounded-lg border border-border hover:border-border-strong font-body-md-medium text-body-md-medium transition-colors" type="button">
+                  Cancel
+                </button>
+<button class="bg-accent hover:brightness-110 active:scale-95 text-white px-space-md py-2 rounded-lg font-body-md-medium text-body-md-medium transition-all shadow-[0_0_16px_rgba(239,68,68,0.25)]" type="button">
+                  Delete All Memories
+                </button>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Section 5: About Section Card -->
+<section class="bg-bg-elevated rounded-xl p-space-xl border border-border shadow-sm flex flex-col gap-space-lg">
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-space-xs pb-space-md border-b border-border">
+<div class="flex items-center gap-space-sm">
+<div class="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center text-text-secondary">
+<span class="material-symbols-outlined text-[20px]">info</span>
+</div>
+<div>
+<h2 class="font-headline-sm text-headline-sm text-text-primary">About MEMORY AI</h2>
+<p class="font-body-sm text-body-sm text-text-muted">Architecture stack, client telemetry, and deployment manifests.</p>
+</div>
+</div>
+<span class="font-label-mono-sm text-label-mono-sm text-text-muted uppercase">Release Track: Stable</span>
+</div>
+<div class="flex flex-col gap-space-md">
+<p class="font-body-lg text-body-lg text-text-primary">
+            MEMORY AI — Personal information retrieval powered by Gemini File Search.
+          </p>
+<!-- Tech Stack JetBrains Mono Tags -->
+<div class="flex flex-col gap-space-xs">
+<span class="font-label-mono-sm text-label-mono-sm uppercase text-text-muted">Core Technology Stack</span>
+<div class="flex flex-wrap gap-space-xs">
+<span class="px-space-sm py-1 rounded bg-bg-base border border-border font-label-mono-sm text-label-mono-sm text-text-secondary hover:border-text-muted transition-colors">
+                Google AI Studio
+              </span>
+<span class="px-space-sm py-1 rounded bg-bg-base border border-border font-label-mono-sm text-label-mono-sm text-text-secondary hover:border-text-muted transition-colors">
+                Gemini API
+              </span>
+<span class="px-space-sm py-1 rounded bg-bg-base border border-border font-label-mono-sm text-label-mono-sm text-accent hover:border-accent transition-colors">
+                File Search API
+              </span>
+<span class="px-space-sm py-1 rounded bg-bg-base border border-border font-label-mono-sm text-label-mono-sm text-text-secondary hover:border-text-muted transition-colors">
+                Supabase
+              </span>
+<span class="px-space-sm py-1 rounded bg-bg-base border border-border font-label-mono-sm text-label-mono-sm text-text-secondary hover:border-text-muted transition-colors">
+                React 19
+              </span>
+<span class="px-space-sm py-1 rounded bg-bg-base border border-border font-label-mono-sm text-label-mono-sm text-text-secondary hover:border-text-muted transition-colors">
+                PWA
+              </span>
+<span class="px-space-sm py-1 rounded bg-bg-base border border-border font-label-mono-sm text-label-mono-sm text-text-secondary hover:border-text-muted transition-colors">
+                Tailwind CSS
+              </span>
+</div>
+</div>
+<!-- Build & Checksum Info -->
+<div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-space-xs pt-space-md border-t border-border font-label-mono-sm text-label-mono-sm text-text-muted">
+<div class="flex items-center gap-space-xs">
+<span class="w-2 h-2 rounded-full bg-success"></span>
+<span>Version 2.4.0-prod · Build #8841-alpha · SHA-256 Verified</span>
+</div>
+<span class="text-text-muted">Crafted with quiet technical precision. All rights reserved.</span>
+</div>
+</div>
+</section>
+</div>
+</div>
+</div></main></div></body></html>

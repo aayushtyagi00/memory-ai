@@ -1,0 +1,17 @@
+{
+  "name": "Memory AI",
+  "short_name": "Memory AI",
+  "description": "Never lose important information again. Turn scattered documents, screenshots and notes into a searchable personal memory.",
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#0a0a0a",
+  "background_color": "#000000",
+  "icons": [
+    {
+      "src": "/logo.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

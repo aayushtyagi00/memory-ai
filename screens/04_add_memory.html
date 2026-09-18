@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_dashboard" name="shell-type"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config={darkMode:"class",theme:{extend:{colors:{"surface-container-low":"#1c1b1c","on-tertiary":"#303035","on-secondary-container":"#b6b4bc","surface":"#131314","on-secondary-fixed":"#1b1b21","on-tertiary-fixed":"#1b1b20","accent-soft":"rgba(239, 68, 68, 0.12)","surface-container-lowest":"#0e0e0f","bg-hover":"#1C1C21","bg-elevated":"#131316","tertiary-fixed":"#e4e1e8","on-background":"#e5e2e3","inverse-primary":"#b91a24","primary-container":"#ff5451","border":"#26262C","error":"#ffb4ab","error-container":"#93000a","border-strong":"#3A3A42","success":"#22C55E","tertiary-fixed-dim":"#c8c5cc","on-tertiary-fixed-variant":"#47464c","on-surface-variant":"#e4beba","on-error":"#690005","secondary":"#c8c5cd","secondary-fixed":"#e4e1e9","surface-dim":"#131314","primary-fixed-dim":"#ffb3ad","text-secondary":"#A1A1AA","tertiary-container":"#919096","on-error-container":"#ffdad6","surface-container-high":"#2a2a2b","on-surface":"#e5e2e3","on-primary-fixed":"#410004","secondary-container":"#46464d","surface-container-highest":"#353436","bg-base":"#0A0A0B","surface-tint":"#ffb3ad","inverse-on-surface":"#313031","primary-fixed":"#ffdad7","on-primary":"#68000a","on-primary-container":"#5c0008","text-primary":"#F4F4F5","background":"#131314","primary":"#ffb3ad","on-secondary-fixed-variant":"#46464d","surface-container":"#201f20","tertiary":"#c8c5cc","on-primary-fixed-variant":"#930013","warning":"#EAB308","on-tertiary-container":"#29292e","inverse-surface":"#e5e2e3","surface-bright":"#3a393a","accent":"#EF4444","outline-variant":"#5b403e","outline":"#ab8986","surface-variant":"#353436","secondary-fixed-dim":"#c8c5cd","text-muted":"#6B6B76","on-secondary":"#303036"},borderRadius:{"DEFAULT":"0.25rem","lg":"0.5rem","xl":"0.75rem","full":"9999px"},spacing:{"space-2xl":"2.5rem","space-3xl":"3rem","space-xl":"2rem","space-xs":"0.5rem","space-md":"1rem","margin-tablet":"1.5rem","margin":"1rem","space-sm":"0.75rem","margin-desktop":"2rem","gutter":"1rem","space-2xs":"0.25rem","gutter-desktop":"1.5rem","space-lg":"1.5rem"},fontFamily:{"headline-lg":["Inter"],"body-sm":["Inter"],"label-mono-sm":["JetBrains Mono"],"headline-sm":["Inter"],"display-hero":["Inter"],"headline-md":["Inter"],"body-lg":["Inter"],"body-md-medium":["Inter"],"body-md":["Inter"],"display-hero-mobile":["Inter"],"label-mono-lg":["JetBrains Mono"],"stat-mono":["JetBrains Mono"]},fontSize:{"headline-lg":["28px",{"lineHeight":"36px","letterSpacing":"-0.02em","fontWeight":"600"}],"body-sm":["13px",{"lineHeight":"20px","fontWeight":"400"}],"label-mono-sm":["11px",{"lineHeight":"16px","letterSpacing":"0.04em","fontWeight":"500"}],"headline-sm":["18px",{"lineHeight":"24px","letterSpacing":"-0.01em","fontWeight":"600"}],"display-hero":["60px",{"lineHeight":"68px","letterSpacing":"-0.03em","fontWeight":"700"}],"headline-md":["22px",{"lineHeight":"28px","letterSpacing":"-0.015em","fontWeight":"600"}],"body-lg":["16px",{"lineHeight":"26px","fontWeight":"400"}],"body-md-medium":["14px",{"lineHeight":"22px","fontWeight":"500"}],"body-md":["14px",{"lineHeight":"22px","fontWeight":"400"}],"display-hero-mobile":["36px",{"lineHeight":"44px","letterSpacing":"-0.025em","fontWeight":"700"}],"label-mono-lg":["13px",{"lineHeight":"18px","letterSpacing":"-0.01em","fontWeight":"500"}],"stat-mono":["32px",{"lineHeight":"38px","letterSpacing":"-0.02em","fontWeight":"600"}]}}}};</script></head><body class="bg-bg-base font-body-md text-text-primary min-h-screen"><aside class="fixed left-0 top-0 h-full w-[240px] bg-bg-elevated z-50 flex flex-col border-r border-border justify-between"><div class="flex flex-col"><div class="h-12 px-space-md flex items-center gap-space-xs border-b border-border"><img alt="Brand logo. - Primary color: #ef4444
+- Font: inter
+- Mode: dark
+- Roundness: rounded-md
+" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1VpGfiThLWaMOO76r99e6YbUWRnJEOe6YlDPypWtK-Gao8T7h_k7ZPedGLfMS2NsdL6Bo8tb1ep1vNlrOfDP9BBdqlcECMH3wUOdx02ltdkgmSv0FPzA_NQUwLh-7hDdHQapkqWKzZWPuxoytCGBCxYcdAY2kD4Bbopewb8c-j7NSmT5UQwch9CwwLJ6YlBm1umSixQ_AQ4yqTOvDOhywfMtqlMgmNKn4JtZksiMk70HbdwzZV-urmbDBEX"/><span class="font-label-mono-lg text-label-mono-lg font-semibold tracking-tight text-text-primary uppercase">MEMORY AI</span></div><nav class="flex flex-col gap-space-2xs px-space-xs py-space-sm" data-active-classes="bg-accent-soft text-text-primary font-medium before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[3px] before:bg-accent before:rounded-full [&amp;&gt;span]:text-accent"><a class="relative flex items-center gap-space-sm px-space-sm py-space-xs rounded-lg text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors font-body-md text-body-md" data-path="home" href="#"><span class="material-symbols-outlined text-[18px]">home</span>Home</a><a class="relative flex items-center gap-space-sm px-space-sm py-space-xs rounded-lg text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors font-body-md text-body-md" data-path="ask-memory" href="#"><span class="material-symbols-outlined text-[18px]">chat_bubble</span>Ask Memory</a><a class="relative flex items-center gap-space-sm px-space-sm py-space-xs rounded-lg text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors font-body-md text-body-md" data-path="memories" href="#"><span class="material-symbols-outlined text-[18px]">database</span>Memories</a><a class="relative flex items-center gap-space-sm px-space-sm py-space-xs rounded-lg text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors font-body-md text-body-md" data-path="timeline" href="#"><span class="material-symbols-outlined text-[18px]">schedule</span>Timeline</a><a class="relative flex items-center gap-space-sm px-space-sm py-space-xs rounded-lg text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors font-body-md text-body-md" data-path="reminders" href="#"><span class="material-symbols-outlined text-[18px]">notifications</span>Reminders</a><a class="relative flex items-center gap-space-sm px-space-sm py-space-xs rounded-lg text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors font-body-md text-body-md" data-path="settings" href="#"><span class="material-symbols-outlined text-[18px]">settings</span>Settings</a></nav></div><div class="p-space-xs border-t border-border"><div class="flex items-center justify-between p-space-xs rounded-lg hover:bg-bg-hover transition-colors"><div class="flex items-center gap-space-xs min-w-0"><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div><div class="flex flex-col min-w-0"><span class="font-body-md-medium text-body-md-medium text-text-primary truncate">Alex Chen</span><span class="font-label-mono-sm text-label-mono-sm text-text-muted truncate">alex.chen@domain.edu</span></div></div><button class="text-text-muted hover:text-accent transition-colors p-space-2xs flex items-center" title="Sign out" type="button"><span class="material-symbols-outlined text-[18px]">logout</span></button></div></div></aside><div class="pl-[240px]"><header class="fixed top-0 left-[240px] right-0 h-12 bg-bg-elevated/90 backdrop-blur-xl border-b border-border z-40 flex items-center justify-between px-space-lg"><div class="flex items-center gap-space-md"><div class="flex items-center gap-space-xs font-label-mono-sm text-label-mono-sm text-text-muted uppercase tracking-wider"><span class="material-symbols-outlined text-[14px] text-accent">terminal</span><span class="">Workspace</span><span class="text-text-muted">/</span><span class="text-text-secondary">Index Engine</span></div></div><div class="flex items-center gap-space-md"><div class="flex items-center gap-space-xs px-space-sm py-[4px] rounded-full bg-success/10 border border-success/20"><span class="w-1.5 h-1.5 rounded-full bg-success animate-pulse"></span><span class="font-label-mono-sm text-label-mono-sm uppercase text-text-primary font-medium tracking-wide">INDEX SYNCED</span></div><button class="flex items-center gap-space-2xs bg-accent hover:brightness-110 active:scale-95 text-white px-space-md py-1.5 rounded-[10px] font-body-md-medium text-body-md-medium transition-all shadow-[0_0_16px_rgba(239,68,68,0.25)]" type="button"><span class="material-symbols-outlined text-[16px]">add</span><span class="">Add Memory</span></button><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></header><main class="relative pt-12 min-h-screen bg-bg-base"><div class="flex flex-col w-full">
+<!-- Radial ambient background glow -->
+<div class="relative w-full overflow-hidden px-space-xl py-space-xl max-w-[1240px] mx-auto">
+<div class="absolute -top-32 left-1/2 -translate-x-1/2 w-[720px] h-[340px] bg-[radial-gradient(ellipse_at_center,rgba(239,68,68,0.08)_0%,transparent_70%)] pointer-events-none -z-10"></div>
+<!-- Page Header -->
+<header class="flex flex-col md:flex-row md:items-end justify-between gap-space-md mb-space-xl pb-space-lg border-b border-border">
+<div class="flex flex-col gap-space-2xs">
+<div class="flex items-center gap-space-xs font-label-mono-sm text-label-mono-sm text-text-muted uppercase tracking-wider mb-space-2xs">
+<span class="w-2 h-2 rounded-full bg-accent"></span>
+<span>Ingest Node 04</span>
+<span class="text-border-strong">/</span>
+<span class="text-text-secondary">Direct Vector Commit</span>
+</div>
+<h1 class="font-headline-lg text-headline-lg text-text-primary tracking-tight">Add to your memory.</h1>
+<p class="font-body-md text-body-md text-text-secondary">Upload raw artifacts or crystallize thoughts to query through personal intelligence retrieval.</p>
+</div>
+<!-- Segmented Tab Switcher -->
+<div class="flex items-center p-1 bg-surface-container-lowest border border-border rounded-xl self-start md:self-auto shrink-0" role="tablist">
+<button aria-selected="true" class="flex items-center gap-space-xs px-space-md py-1.5 rounded-lg font-body-md-medium text-body-md-medium transition-all bg-accent-soft text-text-primary shadow-[0_0_12px_rgba(239,68,68,0.15)] border border-accent/40" id="tab-btn-upload" onclick="switchTab('upload')" role="tab">
+<span class="material-symbols-outlined text-[16px] text-accent">upload_file</span>
+<span>Upload File</span>
+</button>
+<button aria-selected="false" class="flex items-center gap-space-xs px-space-md py-1.5 rounded-lg font-body-md-medium text-body-md-medium text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-all border border-transparent" id="tab-btn-note" onclick="switchTab('note')" role="tab">
+<span class="material-symbols-outlined text-[16px]">edit_note</span>
+<span>Write Note</span>
+</button>
+</div>
+</header>
+<!-- CONTENT SECTION: TAB 1 (UPLOAD FILE) -->
+<div class="flex flex-col gap-space-xl" id="panel-upload">
+<!-- Primary Dropzone -->
+<div class="relative group min-h-[240px] rounded-xl border-2 border-dashed border-border-strong bg-bg-elevated/40 hover:bg-bg-elevated/80 transition-all duration-200 flex flex-col items-center justify-center p-space-xl text-center cursor-pointer" id="dropzone">
+<div class="w-14 h-14 rounded-xl bg-surface-container border border-border flex items-center justify-center mb-space-md group-hover:scale-105 group-hover:border-accent/40 transition-all shadow-sm">
+<span class="material-symbols-outlined text-[32px] text-text-secondary group-hover:text-accent transition-colors">cloud_upload</span>
+</div>
+<span class="font-headline-sm text-headline-sm text-text-primary mb-space-2xs">Drag files here or browse</span>
+<p class="font-label-mono-sm text-label-mono-sm text-text-muted mb-space-md">PDF · DOCX · TXT · MD · PNG · JPG — max 15 MB</p>
+<div class="flex items-center gap-space-sm">
+<label class="inline-flex items-center gap-space-xs bg-bg-elevated hover:bg-bg-hover text-accent border border-accent/40 px-space-md py-2 rounded-lg font-body-md-medium text-body-md-medium transition cursor-pointer shadow-[0_0_12px_rgba(239,68,68,0.1)]">
+<span class="material-symbols-outlined text-[18px]">attachment</span>
+<span>Browse files</span>
+<input accept=".pdf,.docx,.txt,.md,.png,.jpg,.jpeg" class="hidden" type="file"/>
+</label>
+</div>
+<div class="mt-space-md flex items-center gap-space-2xs font-label-mono-sm text-label-mono-sm text-text-muted">
+<span class="material-symbols-outlined text-[14px]">block</span>
+<span>Not supported: MP3, MP4, ZIP, executables or encrypted blobs.</span>
+</div>
+</div>
+<!-- Active File Ingest & Metadata Configuration -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-space-lg items-start">
+<!-- Left: Queued Files Preview -->
+<div class="lg:col-span-6 flex flex-col gap-space-md">
+<div class="flex items-center justify-between">
+<span class="font-label-mono-sm text-label-mono-sm uppercase tracking-wider text-text-muted flex items-center gap-space-2xs">
+<span class="material-symbols-outlined text-[14px] text-accent">fact_check</span>
+              Staged Files (2)
+            </span>
+<span class="font-label-mono-sm text-label-mono-sm text-text-secondary">6.0 MB committed</span>
+</div>
+<!-- Document Item Card -->
+<div class="bg-bg-elevated border border-border rounded-xl p-space-md flex items-center justify-between gap-space-md hover:border-border-strong transition">
+<div class="flex items-center gap-space-sm min-w-0">
+<div class="w-10 h-10 rounded-lg bg-accent-soft border border-accent/20 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-accent text-[20px]">picture_as_pdf</span>
+</div>
+<div class="flex flex-col min-w-0">
+<span class="font-label-mono-lg text-label-mono-lg text-text-primary truncate" title="course_syllabus_and_reading_list_fall2026.pdf">
+                  course_syllabus_and_reading_list_fall2026.pdf
+                </span>
+<div class="flex items-center gap-space-2xs font-label-mono-sm text-label-mono-sm text-text-muted mt-0.5">
+<span>PDF Document</span>
+<span>·</span>
+<span>4.2 MB</span>
+<span>·</span>
+<span class="text-warning">Awaiting metadata</span>
+</div>
+</div>
+</div>
+<button class="text-text-muted hover:text-accent p-1.5 rounded-lg hover:bg-bg-hover transition shrink-0" title="Remove file" type="button">
+<span class="material-symbols-outlined text-[18px]">close</span>
+</button>
+</div>
+<!-- Image Item Card with Thumbnail -->
+<div class="bg-bg-elevated border border-border rounded-xl p-space-md flex items-center justify-between gap-space-md hover:border-border-strong transition">
+<div class="flex items-center gap-space-sm min-w-0">
+<div class="w-10 h-10 rounded-lg bg-surface-container border border-border overflow-hidden shrink-0 relative flex items-center justify-center">
+<img class="w-full h-full object-cover" data-alt="High contrast technical receipt scan showing hostel security deposit transaction details, bank stamp, dark aesthetic, monochrome macro product photo" src="https://lh3.googleusercontent.com/aida-public/AB6AXuArkIDPQclp2UyEP0gO_h4ugOSxQZJnbDp_xQCHhHvUudileNr0PkhbkzQE68E78gvAQaOlQUl1yrJJ7MczzmGPedgV5qKcnRqX76TxpMy-dJMxu7u1257WhHd69jVth8RSft_mvhb-yLk3hPDspbDEHDF_DuCSIHOYtMyFIXGvBasjXUdYJdPTh-DIHYLyvhdNW-EwXvRtUhh46A7Ph9z8yvexadyy7sjn34B6_B3PfOHPmAwhbN8S2w"/>
+<div class="absolute inset-0 bg-black/20"></div>
+</div>
+<div class="flex flex-col min-w-0">
+<span class="font-label-mono-lg text-label-mono-lg text-text-primary truncate" title="hostel_security_deposit_receipt.png">
+                  hostel_security_deposit_receipt.png
+                </span>
+<div class="flex items-center gap-space-2xs font-label-mono-sm text-label-mono-sm text-text-muted mt-0.5">
+<span>PNG Image</span>
+<span>·</span>
+<span>1.8 MB</span>
+<span>·</span>
+<span class="text-success">OCR extracted</span>
+</div>
+</div>
+</div>
+<button class="text-text-muted hover:text-accent p-1.5 rounded-lg hover:bg-bg-hover transition shrink-0" title="Remove file" type="button">
+<span class="material-symbols-outlined text-[18px]">close</span>
+</button>
+</div>
+<!-- Contextual Ingestion Tip -->
+<div class="bg-surface-container-lowest border border-border rounded-xl p-space-md flex items-start gap-space-sm">
+<span class="material-symbols-outlined text-[18px] text-text-muted shrink-0 mt-0.5">neurology</span>
+<p class="font-body-sm text-body-sm text-text-secondary leading-relaxed">
+              Gemini File Search automatically constructs deterministic vector embeddings with dense sliding windows. Tabular data and lecture schematics are preserved as high-fidelity markdown representations.
+            </p>
+</div>
+</div>
+<!-- Right: Metadata Form -->
+<div class="lg:col-span-6 bg-bg-elevated border border-border rounded-xl p-space-lg flex flex-col gap-space-md">
+<div class="flex items-center justify-between border-b border-border pb-space-sm">
+<span class="font-label-mono-lg text-label-mono-lg text-text-primary font-medium flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-[16px] text-text-muted">tune</span>
+              Metadata Annotations
+            </span>
+<span class="font-label-mono-sm text-label-mono-sm text-text-muted">Applied to all staged files</span>
+</div>
+<div class="flex flex-col gap-space-2xs">
+<label class="font-label-mono-sm text-label-mono-sm uppercase tracking-wider text-text-secondary">Memory Title (Optional)</label>
+<input class="w-full bg-bg-base border border-border focus:border-accent focus:shadow-[0_0_0_2px_rgba(239,68,68,0.2)] outline-none rounded-lg px-space-sm py-2 text-text-primary font-body-md text-body-md placeholder:text-text-muted transition" placeholder="e.g., Database Systems Syllabus &amp; Grading Criteria" type="text"/>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-space-md">
+<div class="flex flex-col gap-space-2xs">
+<label class="font-label-mono-sm text-label-mono-sm uppercase tracking-wider text-text-secondary">Category</label>
+<div class="relative">
+<select class="w-full appearance-none bg-bg-base border border-border focus:border-accent focus:shadow-[0_0_0_2px_rgba(239,68,68,0.2)] outline-none rounded-lg px-space-sm py-2 pr-8 text-text-primary font-body-md text-body-md cursor-pointer transition">
+<option selected="" value="college">College</option>
+<option value="finance">Finance</option>
+<option value="work">Work</option>
+<option value="personal">Personal</option>
+<option value="travel">Travel</option>
+<option value="other">Other</option>
+</select>
+<span class="material-symbols-outlined absolute right-2 top-2.5 text-text-muted pointer-events-none text-[18px]">expand_more</span>
+</div>
+</div>
+<div class="flex flex-col gap-space-2xs">
+<label class="font-label-mono-sm text-label-mono-sm uppercase tracking-wider text-text-secondary">Access Tier</label>
+<div class="w-full bg-bg-base border border-border rounded-lg px-space-sm py-2 text-text-secondary font-label-mono-sm text-label-mono-sm flex items-center justify-between">
+<span class="flex items-center gap-space-2xs">
+<span class="w-1.5 h-1.5 rounded-full bg-accent"></span>
+                  Local Vault Encrypted
+                </span>
+<span class="material-symbols-outlined text-[16px] text-text-muted">lock</span>
+</div>
+</div>
+</div>
+<div class="flex flex-col gap-space-2xs">
+<label class="font-label-mono-sm text-label-mono-sm uppercase tracking-wider text-text-secondary">Tags (Optional)</label>
+<div class="w-full bg-bg-base border border-border focus-within:border-accent focus-within:shadow-[0_0_0_2px_rgba(239,68,68,0.2)] rounded-lg p-space-2xs flex flex-wrap gap-space-2xs items-center transition">
+<span class="inline-flex items-center gap-1 bg-surface-container-high text-text-primary font-label-mono-sm text-label-mono-sm px-2 py-1 rounded-md">
+                #academics
+                <button class="text-text-muted hover:text-accent transition" type="button"><span class="material-symbols-outlined text-[12px]">close</span></button>
+</span>
+<span class="inline-flex items-center gap-1 bg-surface-container-high text-text-primary font-label-mono-sm text-label-mono-sm px-2 py-1 rounded-md">
+                #fall2026
+                <button class="text-text-muted hover:text-accent transition" type="button"><span class="material-symbols-outlined text-[12px]">close</span></button>
+</span>
+<input class="bg-transparent border-none outline-none font-label-mono-sm text-label-mono-sm text-text-primary px-2 py-1 placeholder:text-text-muted flex-1 min-w-[90px]" placeholder="+ Add tag..." type="text"/>
+</div>
+</div>
+<div class="flex items-center justify-end gap-space-sm pt-space-xs mt-space-2xs border-t border-border">
+<button class="px-space-md py-2 rounded-lg font-body-md-medium text-body-md-medium text-text-secondary hover:text-text-primary hover:bg-bg-hover transition" type="button">
+              Reset
+            </button>
+<button class="flex items-center gap-space-xs bg-accent hover:brightness-110 active:scale-[0.98] text-white px-space-lg py-2 rounded-lg font-body-md-medium text-body-md-medium transition shadow-[0_0_16px_rgba(239,68,68,0.25)]" type="button">
+<span class="material-symbols-outlined text-[18px]">bolt</span>
+<span>Start Ingestion Engine</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Progressive Pipeline Statuses Showcase -->
+<section class="flex flex-col gap-space-md pt-space-md border-t border-border">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-[18px] text-accent">timeline</span>
+<h2 class="font-headline-sm text-headline-sm text-text-primary">Pipeline Lifecycle States</h2>
+</div>
+<span class="font-label-mono-sm text-label-mono-sm text-text-muted uppercase">Architecture Verification Grid</span>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-space-md">
+<!-- State 1: Uploading -->
+<div class="bg-bg-elevated border border-border rounded-xl p-space-lg flex flex-col justify-between gap-space-md">
+<div class="flex flex-col gap-space-xs">
+<div class="flex items-center justify-between">
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-accent-soft text-accent font-label-mono-sm text-label-mono-sm uppercase tracking-wide">
+<span class="w-1.5 h-1.5 rounded-full bg-accent"></span>
+                  State 1: Network Ingest
+                </span>
+<span class="font-label-mono-sm text-label-mono-sm text-accent font-semibold">70%</span>
+</div>
+<div class="font-headline-sm text-headline-sm text-text-primary mt-1">Uploading… 70%</div>
+<div class="font-label-mono-sm text-label-mono-sm text-text-muted">3.1 MB / 4.2 MB · 1.2 MB/s</div>
+</div>
+<div class="flex flex-col gap-1.5">
+<div class="w-full h-1.5 bg-bg-hover rounded-full overflow-hidden">
+<div class="h-full bg-accent rounded-full w-[70%] transition-all duration-300"></div>
+</div>
+<div class="flex justify-between font-label-mono-sm text-label-mono-sm text-text-muted">
+<span>course_syllabus.pdf</span>
+<span>ETA 0.9s</span>
+</div>
+</div>
+</div>
+<!-- State 2: Gemini Chunking & Vectorization -->
+<div class="bg-bg-elevated border border-border-strong rounded-xl p-space-lg flex flex-col justify-between gap-space-md relative overflow-hidden">
+<div class="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-accent to-transparent animate-pulse"></div>
+<div class="flex flex-col gap-space-xs">
+<div class="flex items-center justify-between">
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-warning/10 text-warning font-label-mono-sm text-label-mono-sm uppercase tracking-wide">
+<span class="w-1.5 h-1.5 rounded-full bg-warning animate-ping"></span>
+                  State 2: Embedding
+                </span>
+<span class="material-symbols-outlined text-[16px] text-accent animate-spin">sync</span>
+</div>
+<div class="font-headline-sm text-headline-sm text-text-primary flex items-center gap-2 mt-1">
+<span>Processing with Gemini…</span>
+<span class="w-2 h-2 rounded-full bg-accent animate-pulse"></span>
+</div>
+<p class="font-label-mono-sm text-label-mono-sm text-text-secondary leading-relaxed">
+                Deterministic chunking &amp; vector embedding generation (Gemini File Search API).
+              </p>
+</div>
+<!-- Animated Shimmer Bar -->
+<div class="flex flex-col gap-1.5">
+<div class="w-full h-1.5 bg-bg-hover rounded-full overflow-hidden relative">
+<div class="absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-transparent via-accent to-transparent rounded-full animate-[pulse_1.5s_infinite]"></div>
+</div>
+<div class="flex justify-between font-label-mono-sm text-label-mono-sm text-text-muted">
+<span>Layer: 1536-dim tensor</span>
+<span class="font-mono text-accent">Active</span>
+</div>
+</div>
+</div>
+<!-- State 3: Successfully Indexed -->
+<div class="bg-bg-elevated border border-border rounded-xl p-space-lg flex flex-col justify-between gap-space-md">
+<div class="flex flex-col gap-space-xs">
+<div class="flex items-center justify-between">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-success/10 text-success font-label-mono-sm text-label-mono-sm uppercase tracking-wide">
+<span class="w-1.5 h-1.5 rounded-full bg-success"></span>
+                  State 3: Complete
+                </span>
+<span class="material-symbols-outlined text-[18px] text-success">verified</span>
+</div>
+<div class="font-headline-sm text-headline-sm text-text-primary mt-1">Indexed ✓</div>
+<p class="font-body-sm text-body-sm text-text-secondary">Your document is now searchable across neural recall queries.</p>
+</div>
+<div class="flex flex-col gap-space-xs pt-space-2xs">
+<div class="flex items-center gap-space-2xs">
+<button class="flex-1 bg-accent hover:brightness-110 active:scale-[0.98] text-white py-1.5 px-space-sm rounded-lg font-body-md-medium text-body-md-medium flex items-center justify-center gap-1 text-center transition shadow-[0_0_12px_rgba(239,68,68,0.2)]" type="button">
+<span class="material-symbols-outlined text-[15px]">search_spark</span>
+<span>Ask about this</span>
+</button>
+<button class="bg-surface-container hover:bg-bg-hover border border-border px-space-sm py-1.5 rounded-lg font-label-mono-sm text-label-mono-sm text-text-secondary hover:text-text-primary transition" title="Inspect In Database" type="button">
+                  Library
+                </button>
+</div>
+</div>
+</div>
+</div>
+</section>
+</div>
+<!-- CONTENT SECTION: TAB 2 (WRITE NOTE) -->
+<div class="hidden flex-col gap-space-lg" id="panel-note">
+<div class="bg-bg-elevated border border-border rounded-xl p-space-xl flex flex-col gap-space-lg">
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-space-md border-b border-border pb-space-md">
+<div class="flex flex-col">
+<span class="font-headline-sm text-headline-sm text-text-primary">Instant Knowledge Scratchpad</span>
+<span class="font-body-sm text-body-sm text-text-muted">Directly tokenize unformatted insights, lecture fragments, or meeting transcripts.</span>
+</div>
+<div class="flex items-center gap-space-xs font-label-mono-sm text-label-mono-sm text-text-muted">
+<span class="material-symbols-outlined text-[16px] text-success">offline_bolt</span>
+<span>Markdown Enabled</span>
+</div>
+</div>
+<!-- Note Input Form -->
+<div class="flex flex-col gap-space-md">
+<div class="flex flex-col gap-space-2xs">
+<label class="font-label-mono-sm text-label-mono-sm uppercase tracking-wider text-text-secondary">Note Title</label>
+<input class="w-full bg-bg-base border border-border focus:border-accent focus:shadow-[0_0_0_2px_rgba(239,68,68,0.2)] outline-none rounded-lg px-space-sm py-2.5 text-text-primary font-headline-sm text-headline-sm transition" placeholder="e.g., Discussion with Prof. Miller on Graph Algorithms" type="text" value="Discussion with Prof. Miller on Graph Algorithms"/>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-space-md">
+<div class="flex flex-col gap-space-2xs">
+<label class="font-label-mono-sm text-label-mono-sm uppercase tracking-wider text-text-secondary">Target Domain</label>
+<div class="relative">
+<select class="w-full appearance-none bg-bg-base border border-border focus:border-accent focus:shadow-[0_0_0_2px_rgba(239,68,68,0.2)] outline-none rounded-lg px-space-sm py-2 pr-8 text-text-primary font-body-md text-body-md cursor-pointer transition">
+<option selected="" value="college">College / Research</option>
+<option value="work">Work &amp; Engineering</option>
+<option value="personal">Personal Projects</option>
+<option value="finance">Finance Logs</option>
+</select>
+<span class="material-symbols-outlined absolute right-2 top-2.5 text-text-muted pointer-events-none text-[18px]">expand_more</span>
+</div>
+</div>
+<div class="flex flex-col gap-space-2xs">
+<label class="font-label-mono-sm text-label-mono-sm uppercase tracking-wider text-text-secondary">Taxonomy Tokens</label>
+<div class="w-full bg-bg-base border border-border rounded-lg p-space-2xs flex flex-wrap gap-space-2xs items-center">
+<span class="inline-flex items-center gap-1 bg-surface-container-high text-text-primary font-label-mono-sm text-label-mono-sm px-2 py-1 rounded-md">
+                  #research
+                  <button class="text-text-muted hover:text-accent" type="button"><span class="material-symbols-outlined text-[12px]">close</span></button>
+</span>
+<span class="inline-flex items-center gap-1 bg-surface-container-high text-text-primary font-label-mono-sm text-label-mono-sm px-2 py-1 rounded-md">
+                  #meeting-notes
+                  <button class="text-text-muted hover:text-accent" type="button"><span class="material-symbols-outlined text-[12px]">close</span></button>
+</span>
+<span class="inline-flex items-center gap-1 bg-surface-container-high text-text-primary font-label-mono-sm text-label-mono-sm px-2 py-1 rounded-md">
+                  #fall2026
+                  <button class="text-text-muted hover:text-accent" type="button"><span class="material-symbols-outlined text-[12px]">close</span></button>
+</span>
+</div>
+</div>
+</div>
+<!-- Markdown Editor Area -->
+<div class="flex flex-col gap-space-2xs">
+<div class="flex items-center justify-between">
+<label class="font-label-mono-sm text-label-mono-sm uppercase tracking-wider text-text-secondary">Body Content (Markdown)</label>
+<span class="font-label-mono-sm text-label-mono-sm text-text-muted">412 characters · 64 tokens</span>
+</div>
+<textarea class="w-full bg-bg-base border border-border focus:border-accent focus:shadow-[0_0_0_2px_rgba(239,68,68,0.2)] outline-none rounded-xl p-space-md font-label-mono-sm text-label-mono-sm text-text-primary leading-relaxed resize-y transition" rows="10">### Agenda &amp; Key Directives
+- Reviewed adjacency matrix memory density under sparse tensor conditions.
+- Target bottleneck: Dijkstra heap overhead during cyclic re-weighting cycles.
+- Proposed migration: 2-3 Fibonacci heaps with vectorized batch updates.
+
+**Action Item:** Draft benchmark harness against Stanford SNAP graph datasets prior to Thursday advisory sync.</textarea>
+</div>
+<!-- Action Bar -->
+<div class="flex items-center justify-between pt-space-sm border-t border-border mt-space-2xs">
+<div class="flex items-center gap-space-xs font-label-mono-sm text-label-mono-sm text-text-muted">
+<span class="material-symbols-outlined text-[16px] text-text-muted">history</span>
+<span>Draft auto-saved 20s ago</span>
+</div>
+<div class="flex items-center gap-space-sm">
+<button class="bg-bg-elevated hover:bg-bg-hover text-text-secondary hover:text-text-primary border border-border px-space-md py-2 rounded-lg font-body-md-medium text-body-md-medium transition" type="button">
+                Discard
+              </button>
+<button class="flex items-center gap-space-xs bg-accent hover:brightness-110 active:scale-[0.98] text-white px-space-lg py-2 rounded-lg font-body-md-medium text-body-md-medium transition shadow-[0_0_16px_rgba(239,68,68,0.25)]" onclick="triggerToast()" type="button">
+<span class="material-symbols-outlined text-[18px]">save</span>
+<span>Save Note</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- PERSISTENT TOAST NOTIFICATION -->
+<div class="fixed bottom-space-lg right-space-lg z-50 transition-all duration-300 transform translate-y-0 opacity-100" id="toast-notification">
+<div class="bg-bg-elevated/95 backdrop-blur-xl border border-border-strong rounded-xl p-space-md shadow-2xl flex items-start gap-space-sm max-w-sm">
+<div class="w-8 h-8 rounded-full bg-success/10 border border-success/30 flex items-center justify-center shrink-0 mt-0.5">
+<span class="material-symbols-outlined text-success text-[18px]">check_circle</span>
+</div>
+<div class="flex flex-col min-w-0 pr-space-xs">
+<span class="font-body-md-medium text-body-md-medium text-text-primary">Note saved to memory</span>
+<span class="font-label-mono-sm text-label-mono-sm text-text-muted mt-0.5">Indexed in 140ms · 4 vector blocks generated</span>
+</div>
+<button class="text-text-muted hover:text-text-primary transition p-1 -mr-1" onclick="dismissToast()" title="Dismiss" type="button">
+<span class="material-symbols-outlined text-[16px]">close</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Interactive Logic -->
+<script>
+    function switchTab(tab) {
+      const uploadBtn = document.getElementById('tab-btn-upload');
+      const noteBtn = document.getElementById('tab-btn-note');
+      const uploadPanel = document.getElementById('panel-upload');
+      const notePanel = document.getElementById('panel-note');
+
+      if (tab === 'upload') {
+        uploadBtn.className = "flex items-center gap-space-xs px-space-md py-1.5 rounded-lg font-body-md-medium text-body-md-medium transition-all bg-accent-soft text-text-primary shadow-[0_0_12px_rgba(239,68,68,0.15)] border border-accent/40";
+        uploadBtn.setAttribute('aria-selected', 'true');
+        
+        noteBtn.className = "flex items-center gap-space-xs px-space-md py-1.5 rounded-lg font-body-md-medium text-body-md-medium text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-all border border-transparent";
+        noteBtn.setAttribute('aria-selected', 'false');
+
+        uploadPanel.classList.remove('hidden');
+        uploadPanel.classList.add('flex');
+        notePanel.classList.remove('flex');
+        notePanel.classList.add('hidden');
+      } else {
+        noteBtn.className = "flex items-center gap-space-xs px-space-md py-1.5 rounded-lg font-body-md-medium text-body-md-medium transition-all bg-accent-soft text-text-primary shadow-[0_0_12px_rgba(239,68,68,0.15)] border border-accent/40";
+        noteBtn.setAttribute('aria-selected', 'true');
+
+        uploadBtn.className = "flex items-center gap-space-xs px-space-md py-1.5 rounded-lg font-body-md-medium text-body-md-medium text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-all border border-transparent";
+        uploadBtn.setAttribute('aria-selected', 'false');
+
+        notePanel.classList.remove('hidden');
+        notePanel.classList.add('flex');
+        uploadPanel.classList.remove('flex');
+        uploadPanel.classList.add('hidden');
+      }
+    }
+
+    function dismissToast() {
+      const toast = document.getElementById('toast-notification');
+      toast.classList.add('opacity-0', 'translate-y-4');
+      setTimeout(() => {
+        toast.style.display = 'none';
+      }, 300);
+    }
+
+    function triggerToast() {
+      const toast = document.getElementById('toast-notification');
+      toast.style.display = 'block';
+      setTimeout(() => {
+        toast.classList.remove('opacity-0', 'translate-y-4');
+      }, 10);
+    }
+  </script>
+</div></main></div>
+</body></html>
