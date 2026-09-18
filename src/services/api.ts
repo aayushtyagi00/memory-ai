@@ -1,5 +1,5 @@
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { Memory, Note, Reminder, AskResponse, UserStats, Source, ChatConversation } from '../types';
+import { getSupabaseClient, isSupabaseConfigured } from '../lib/supabase';
+import { Memory, Reminder, AskResponse, UserStats, Source, ChatConversation } from '../types';
 import { INITIAL_DEMO_MEMORIES, DEMO_REMINDERS, INITIAL_DEMO_CONVERSATIONS } from './demoData';
 import { geminiService } from './gemini';
 
@@ -21,7 +21,11 @@ function getLocalConversations(): ChatConversation[] {
 }
 
 function saveLocalConversations(conversations: ChatConversation[]) {
-  localStorage.setItem(LOCAL_CONVERSATIONS_KEY, JSON.stringify(conversations));
+  try {
+    localStorage.setItem(LOCAL_CONVERSATIONS_KEY, JSON.stringify(conversations));
+  } catch (e) {
+    console.warn('Failed to save conversations to local storage:', e);
+  }
 }
 
 function getLocalMemories(): Memory[] {
@@ -38,7 +42,11 @@ function getLocalMemories(): Memory[] {
 }
 
 function saveLocalMemories(memories: Memory[]) {
-  localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(memories));
+  try {
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(memories));
+  } catch (e) {
+    console.warn('Failed to save memories to local storage:', e);
+  }
 }
 
 function getLocalReminders(): Reminder[] {
@@ -55,20 +63,29 @@ function getLocalReminders(): Reminder[] {
 }
 
 function saveLocalReminders(reminders: Reminder[]) {
-  localStorage.setItem(LOCAL_REMINDERS_KEY, JSON.stringify(reminders));
+  try {
+    localStorage.setItem(LOCAL_REMINDERS_KEY, JSON.stringify(reminders));
+  } catch (e) {
+    console.warn('Failed to save reminders to local storage:', e);
+  }
 }
 
 export const api = {
   async getStats(): Promise<UserStats> {
-    if (isSupabaseConfigured && supabase) {
-      const { data, error } = await supabase.from('memories').select('type');
-      if (!error && data) {
-        return {
-          total: data.length,
-          documents: data.filter((m) => m.type === 'document').length,
-          notes: data.filter((m) => m.type === 'note').length,
-          images: data.filter((m) => m.type === 'image').length,
-        };
+    const client = getSupabaseClient();
+    if (isSupabaseConfigured() && client) {
+      try {
+        const { data, error } = await client.from('memories').select('type');
+        if (!error && data) {
+          return {
+            total: data.length,
+            documents: data.filter((m) => m.type === 'document').length,
+            notes: data.filter((m) => m.type === 'note').length,
+            images: data.filter((m) => m.type === 'image').length,
+          };
+        }
+      } catch (err) {
+        console.warn('Error fetching stats from Supabase:', err);
       }
     }
     const mems = getLocalMemories();
@@ -81,26 +98,36 @@ export const api = {
   },
 
   async listMemories(): Promise<Memory[]> {
-    if (isSupabaseConfigured && supabase) {
-      const { data, error } = await supabase
-        .from('memories')
-        .select('*')
-        .order('created_at', { ascending: false });
-      if (!error && data) {
-        return data as Memory[];
+    const client = getSupabaseClient();
+    if (isSupabaseConfigured() && client) {
+      try {
+        const { data, error } = await client
+          .from('memories')
+          .select('*')
+          .order('created_at', { ascending: false });
+        if (!error && data) {
+          return data as Memory[];
+        }
+      } catch (err) {
+        console.warn('Error listing memories from Supabase:', err);
       }
     }
     return getLocalMemories();
   },
 
   async getMemory(id: string): Promise<Memory | null> {
-    if (isSupabaseConfigured && supabase) {
-      const { data, error } = await supabase
-        .from('memories')
-        .select('*')
-        .eq('id', id)
-        .single();
-      if (!error && data) return data as Memory;
+    const client = getSupabaseClient();
+    if (isSupabaseConfigured() && client) {
+      try {
+        const { data, error } = await client
+          .from('memories')
+          .select('*')
+          .eq('id', id)
+          .single();
+        if (!error && data) return data as Memory;
+      } catch (err) {
+        console.warn('Error getting memory from Supabase:', err);
+      }
     }
     const mems = getLocalMemories();
     return mems.find((m) => m.id === id) || null;
@@ -112,30 +139,7 @@ export const api = {
     category = 'General',
     tags: string[] = []
   ): Promise<Memory> {
-    if (isSupabaseConfigured && supabase) {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token;
-
-      const formData = new FormData();
-      formData.append('file', file);
-      if (title) formData.append('title', title);
-      formData.append('category', category);
-      formData.append('tags', JSON.stringify(tags));
-
-      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/upload-memory`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: formData,
-      });
-
-      const resData = await res.json();
-      if (!res.ok) throw new Error(resData.error || 'Upload failed');
-      return resData.memory;
-    }
-
-    // Local / Client-side flow
+    const client = getSupabaseClient();
     const mimeType = file.type || 'application/octet-stream';
     const isImage = mimeType.startsWith('image/');
     const memoryType = isImage ? 'image' : 'document';
@@ -144,7 +148,7 @@ export const api = {
     let content = `Uploaded file: ${file.name}`;
     let storagePath: string | undefined = undefined;
 
-    // If image, create data URL for thumbnail preview and multimodal vision extraction
+    // Handle file preview and Gemini vision/text extraction
     if (isImage) {
       const dataUrl = await new Promise<string>((resolve) => {
         const reader = new FileReader();
@@ -154,7 +158,6 @@ export const api = {
       });
       storagePath = dataUrl;
 
-      // If Gemini is active, use vision to extract content from the image
       if (geminiService.hasApiKey()) {
         try {
           const visionResult = await geminiService.extractTextFromImage(file);
@@ -175,9 +178,72 @@ export const api = {
       originalFileName.endsWith('.csv') ||
       originalFileName.endsWith('.json')
     ) {
-      content = await file.text();
+      try {
+        content = await file.text();
+      } catch {
+        content = `Document: ${file.name}`;
+      }
     }
 
+    // Direct Supabase PostgreSQL & Storage Insertion
+    if (isSupabaseConfigured() && client) {
+      try {
+        const { data: userData } = await client.auth.getUser();
+        const user = userData?.user;
+
+        if (user) {
+          let remoteStoragePath: string | undefined = undefined;
+
+          // Attempt uploading file to Supabase Cloud Storage bucket
+          try {
+            const cloudPath = `${user.id}/${Date.now()}_${originalFileName}`;
+            const { error: uploadError } = await client.storage
+              .from('memory-files')
+              .upload(cloudPath, file, { upsert: true });
+
+            if (!uploadError) {
+              remoteStoragePath = cloudPath;
+            } else {
+              console.warn('Supabase storage upload notice:', uploadError.message);
+            }
+          } catch (storageErr) {
+            console.warn('Supabase storage exception (using data/fallback):', storageErr);
+          }
+
+          const memoryRecord: Partial<Memory> = {
+            user_id: user.id,
+            title: title || file.name.replace(/\.[^/.]+$/, ''),
+            description: `Uploaded ${file.name} (${Math.round(file.size / 1024)} KB)`,
+            type: memoryType,
+            category,
+            tags,
+            storage_path: remoteStoragePath || storagePath,
+            original_file_name: originalFileName,
+            mime_type: mimeType,
+            file_size: file.size,
+            indexing_status: 'ready',
+            is_favorite: false,
+            content,
+          };
+
+          const { data: inserted, error: insertError } = await client
+            .from('memories')
+            .insert(memoryRecord)
+            .select()
+            .single();
+
+          if (!insertError && inserted) {
+            return inserted as Memory;
+          } else {
+            console.warn('Supabase insert memories error, falling back to local:', insertError);
+          }
+        }
+      } catch (err) {
+        console.warn('Supabase upload flow failed, saving locally:', err);
+      }
+    }
+
+    // Local / Demo Mode Fallback
     const newMemory: Memory = {
       id: 'mem-' + Date.now(),
       user_id: 'current-user',
@@ -209,26 +275,55 @@ export const api = {
     category = 'Personal',
     tags: string[] = []
   ): Promise<Memory> {
-    if (isSupabaseConfigured && supabase) {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token;
-
-      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-note`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ title, content, category, tags }),
-      });
-
-      const resData = await res.json();
-      if (!res.ok) throw new Error(resData.error || 'Failed to create note');
-      return resData.memory;
-    }
-
+    const client = getSupabaseClient();
     const safeTitle = title.trim();
     const fileName = `${safeTitle.replace(/[^\w\.\-\s]/gi, '_')}.txt`;
+
+    if (isSupabaseConfigured() && client) {
+      try {
+        const { data: userData } = await client.auth.getUser();
+        const user = userData?.user;
+
+        if (user) {
+          const { data: insertedMem, error: insertError } = await client
+            .from('memories')
+            .insert({
+              user_id: user.id,
+              title: safeTitle,
+              description: content.slice(0, 100) + (content.length > 100 ? '...' : ''),
+              type: 'note',
+              category,
+              tags,
+              original_file_name: fileName,
+              mime_type: 'text/plain',
+              file_size: content.length,
+              indexing_status: 'ready',
+              is_favorite: false,
+              content,
+            })
+            .select()
+            .single();
+
+          if (!insertError && insertedMem) {
+            // Also store in notes table for relational consistency
+            try {
+              await client.from('notes').insert({
+                user_id: user.id,
+                memory_id: insertedMem.id,
+                content,
+              });
+            } catch (noteErr) {
+              console.warn('Note auxiliary insert notice:', noteErr);
+            }
+            return insertedMem as Memory;
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to insert note into Supabase, saving locally:', err);
+      }
+    }
+
+    // Local / Demo Mode Fallback
     const newMemory: Memory = {
       id: 'note-' + Date.now(),
       user_id: 'current-user',
@@ -257,6 +352,27 @@ export const api = {
     id: string,
     updates: Partial<Pick<Memory, 'title' | 'description' | 'category' | 'tags' | 'content' | 'is_favorite'>>
   ): Promise<Memory | null> {
+    const client = getSupabaseClient();
+    if (isSupabaseConfigured() && client) {
+      try {
+        const { data, error } = await client
+          .from('memories')
+          .update({ ...updates, updated_at: new Date().toISOString() })
+          .eq('id', id)
+          .select()
+          .single();
+
+        if (!error && data) {
+          if (updates.content) {
+            await client.from('notes').update({ content: updates.content }).eq('memory_id', id);
+          }
+          return data as Memory;
+        }
+      } catch (err) {
+        console.warn('Supabase updateMemory notice:', err);
+      }
+    }
+
     const current = getLocalMemories();
     const idx = current.findIndex((m) => m.id === id);
     if (idx === -1) return null;
@@ -268,40 +384,31 @@ export const api = {
     };
 
     saveLocalMemories(current);
-
-    if (isSupabaseConfigured && supabase) {
-      await supabase.from('memories').update(updates).eq('id', id);
-    }
-
     return current[idx];
   },
 
-  async askMemory(question: string, conversationId?: string): Promise<AskResponse> {
-    // 1. If Supabase edge functions are configured and available, query edge function
-    if (isSupabaseConfigured && supabase) {
+  async askMemory(question: string, _conversationId?: string): Promise<AskResponse> {
+    // 1. Fetch available memories (either from Supabase or Local)
+    let memories: Memory[] = [];
+    const client = getSupabaseClient();
+
+    if (isSupabaseConfigured() && client) {
       try {
-        const { data: sessionData } = await supabase.auth.getSession();
-        const token = sessionData.session?.access_token;
-
-        const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ask-memory`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ question, conversationId }),
-        });
-
-        if (res.ok) {
-          const resData = await res.json();
-          return resData;
+        const { data, error } = await client
+          .from('memories')
+          .select('*')
+          .order('created_at', { ascending: false });
+        if (!error && data && data.length > 0) {
+          memories = data as Memory[];
         }
-      } catch (err) {
-        console.warn('Supabase edge function ask-memory failed, falling back to client Gemini / local:', err);
+      } catch (e) {
+        console.warn('Supabase memories fetch for Ask failed:', e);
       }
     }
 
-    const memories = getLocalMemories();
+    if (memories.length === 0) {
+      memories = getLocalMemories();
+    }
 
     // 2. If Gemini API key is configured, execute live Gemini grounded RAG
     if (geminiService.hasApiKey()) {
@@ -309,7 +416,7 @@ export const api = {
         const geminiRes = await geminiService.askMemoryWithGemini(question, memories);
         return geminiRes;
       } catch (err: any) {
-        console.error('Gemini API call failed, falling back to local semantic evaluator:', err);
+        console.error('Gemini API call failed, falling back to semantic evaluator:', err);
       }
     }
 
@@ -325,7 +432,7 @@ export const api = {
       };
     }
 
-    // Standard benchmark test queries
+    // Benchmark test queries
     // 1. DBMS Exam query
     if (qLower.includes('dbms') || (qLower.includes('exam') && !qLower.includes('hostel'))) {
       const mem = memories.find((m) => m.original_file_name?.includes('exam_schedule') || m.content?.includes('DBMS examination'));
@@ -461,7 +568,7 @@ export const api = {
             type: 'document',
             citation: 'project_announcement.pdf',
             snippet: 'Final-year project presentation: 27 September 2026, 11:30 AM.',
-          }
+          },
         ],
         foundInformation: true,
         conflictDetected: true,
@@ -469,8 +576,10 @@ export const api = {
     }
 
     // 7. General search across memories content & title
-    const searchTerms = qLower.split(/\s+/).filter((w) => w.length > 2 && !['what', 'when', 'where', 'which', 'does', 'have', 'from', 'with', 'about', 'this', 'that', 'tell'].includes(w));
-    
+    const searchTerms = qLower
+      .split(/\s+/)
+      .filter((w) => w.length > 2 && !['what', 'when', 'where', 'which', 'does', 'have', 'from', 'with', 'about', 'this', 'that', 'tell'].includes(w));
+
     if (searchTerms.length > 0) {
       let bestMem: Memory | null = null;
       let highestScore = 0;
@@ -492,22 +601,24 @@ export const api = {
         const snippetText = bestMem.content || bestMem.description || bestMem.title;
         return {
           answer: `Based on your memory "${bestMem.title}": ${bestMem.description || snippetText.slice(0, 220)}...`,
-          sources: [{
-            id: bestMem.id,
-            memoryId: bestMem.id,
-            title: bestMem.title,
-            fileName: bestMem.original_file_name || bestMem.title,
-            type: bestMem.type,
-            citation: bestMem.original_file_name || bestMem.title,
-            snippet: snippetText.slice(0, 250),
-          }],
+          sources: [
+            {
+              id: bestMem.id,
+              memoryId: bestMem.id,
+              title: bestMem.title,
+              fileName: bestMem.original_file_name || bestMem.title,
+              type: bestMem.type,
+              citation: bestMem.original_file_name || bestMem.title,
+              snippet: snippetText.slice(0, 250),
+            },
+          ],
           foundInformation: true,
           conflictDetected: false,
         };
       }
     }
 
-    // Exact required not-found response
+    // Exact not-found response
     return {
       answer: "I couldn't find this information in your memories.",
       sources: [],
@@ -517,24 +628,18 @@ export const api = {
   },
 
   async deleteMemory(memoryId: string): Promise<void> {
-    if (isSupabaseConfigured && supabase) {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token;
-      await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/delete-memory`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ memoryId }),
-      });
-      return;
+    const client = getSupabaseClient();
+    if (isSupabaseConfigured() && client) {
+      try {
+        await client.from('memories').delete().eq('id', memoryId);
+      } catch (err) {
+        console.warn('Supabase deleteMemory error:', err);
+      }
     }
 
     const current = getLocalMemories().filter((m) => m.id !== memoryId);
     saveLocalMemories(current);
 
-    // Also remove associated reminders
     const rems = getLocalReminders().filter((r) => r.source_memory_id !== memoryId);
     saveLocalReminders(rems);
   },
@@ -546,16 +651,29 @@ export const api = {
     target.is_favorite = !target.is_favorite;
     saveLocalMemories(current);
 
-    if (isSupabaseConfigured && supabase) {
-      await supabase.from('memories').update({ is_favorite: target.is_favorite }).eq('id', memoryId);
+    const client = getSupabaseClient();
+    if (isSupabaseConfigured() && client) {
+      try {
+        await client.from('memories').update({ is_favorite: target.is_favorite }).eq('id', memoryId);
+      } catch (err) {
+        console.warn('Supabase toggleFavorite error:', err);
+      }
     }
     return target;
   },
 
   async listReminders(): Promise<Reminder[]> {
-    if (isSupabaseConfigured && supabase) {
-      const { data } = await supabase.from('reminders').select('*').order('due_at', { ascending: true });
-      if (data) return data as Reminder[];
+    const client = getSupabaseClient();
+    if (isSupabaseConfigured() && client) {
+      try {
+        const { data, error } = await client
+          .from('reminders')
+          .select('*')
+          .order('due_at', { ascending: true });
+        if (!error && data) return data as Reminder[];
+      } catch (err) {
+        console.warn('Supabase listReminders error:', err);
+      }
     }
     return getLocalReminders();
   },
@@ -566,6 +684,7 @@ export const api = {
     due_at?: string,
     source_memory_id?: string
   ): Promise<Reminder> {
+    const client = getSupabaseClient();
     const newRem: Reminder = {
       id: 'rem-' + Date.now(),
       user_id: 'current-user',
@@ -577,9 +696,21 @@ export const api = {
       created_at: new Date().toISOString(),
     };
 
-    if (isSupabaseConfigured && supabase) {
-      const { data } = await supabase.from('reminders').insert(newRem).select().single();
-      if (data) return data as Reminder;
+    if (isSupabaseConfigured() && client) {
+      try {
+        const { data: userData } = await client.auth.getUser();
+        const user = userData?.user;
+        if (user) {
+          const { data, error } = await client
+            .from('reminders')
+            .insert({ ...newRem, user_id: user.id })
+            .select()
+            .single();
+          if (!error && data) return data as Reminder;
+        }
+      } catch (err) {
+        console.warn('Supabase createReminder error:', err);
+      }
     }
 
     const rems = getLocalReminders();
@@ -595,8 +726,13 @@ export const api = {
     rem.status = rem.status === 'completed' ? 'pending' : 'completed';
     saveLocalReminders(rems);
 
-    if (isSupabaseConfigured && supabase) {
-      await supabase.from('reminders').update({ status: rem.status }).eq('id', reminderId);
+    const client = getSupabaseClient();
+    if (isSupabaseConfigured() && client) {
+      try {
+        await client.from('reminders').update({ status: rem.status }).eq('id', reminderId);
+      } catch (err) {
+        console.warn('Supabase toggleReminder error:', err);
+      }
     }
     return rem;
   },
@@ -605,36 +741,56 @@ export const api = {
     const rems = getLocalReminders().filter((r) => r.id !== reminderId);
     saveLocalReminders(rems);
 
-    if (isSupabaseConfigured && supabase) {
-      await supabase.from('reminders').delete().eq('id', reminderId);
+    const client = getSupabaseClient();
+    if (isSupabaseConfigured() && client) {
+      try {
+        await client.from('reminders').delete().eq('id', reminderId);
+      } catch (err) {
+        console.warn('Supabase deleteReminder error:', err);
+      }
     }
   },
 
   async loadDemoData(): Promise<number> {
-    if (isSupabaseConfigured && supabase) {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token;
-      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/load-demo-data`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      const data = await res.json();
-      return data.count || 6;
-    }
-
     saveLocalMemories(INITIAL_DEMO_MEMORIES);
     saveLocalReminders(DEMO_REMINDERS);
     saveLocalConversations(INITIAL_DEMO_CONVERSATIONS);
+
+    const client = getSupabaseClient();
+    if (isSupabaseConfigured() && client) {
+      try {
+        const { data: userData } = await client.auth.getUser();
+        const user = userData?.user;
+        if (user) {
+          // Bulk insert memories into Supabase for this user
+          const records = INITIAL_DEMO_MEMORIES.map((m) => ({
+            ...m,
+            user_id: user.id,
+            id: undefined, // allow postgres to generate uuid or keep
+          }));
+          await client.from('memories').upsert(records);
+        }
+      } catch (e) {
+        console.warn('Supabase load demo data notice:', e);
+      }
+    }
+
     return INITIAL_DEMO_MEMORIES.length;
   },
 
   async clearAllMemories(): Promise<void> {
-    if (isSupabaseConfigured && supabase) {
-      await supabase.from('memories').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      await supabase.from('reminders').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    const client = getSupabaseClient();
+    if (isSupabaseConfigured() && client) {
+      try {
+        const { data: userData } = await client.auth.getUser();
+        const user = userData?.user;
+        if (user) {
+          await client.from('memories').delete().eq('user_id', user.id);
+          await client.from('reminders').delete().eq('user_id', user.id);
+        }
+      } catch (e) {
+        console.warn('Supabase clear all notice:', e);
+      }
     }
     saveLocalMemories([]);
     saveLocalReminders([]);
@@ -659,14 +815,54 @@ export const api = {
       list.unshift({ ...conv, updated_at: new Date().toISOString() });
     }
     saveLocalConversations(list);
+
+    // Sync to Supabase in background if connected
+    const client = getSupabaseClient();
+    if (isSupabaseConfigured() && client) {
+      client.auth.getUser().then(({ data }) => {
+        const user = data?.user;
+        if (user) {
+          client
+            .from('conversations')
+            .upsert({
+              id: conv.id.includes('-') && conv.id.length === 36 ? conv.id : undefined,
+              user_id: user.id,
+              title: conv.title,
+              updated_at: new Date().toISOString(),
+            })
+            .then(() => {});
+        }
+      }).catch(() => {});
+    }
   },
 
   deleteConversation(id: string): void {
     const list = getLocalConversations().filter((c) => c.id !== id);
     saveLocalConversations(list);
+
+    const client = getSupabaseClient();
+    if (isSupabaseConfigured() && client) {
+      Promise.resolve(client.from('conversations').delete().eq('id', id))
+        .then(() => {})
+        .catch(() => {});
+    }
   },
 
   clearAllConversations(): void {
     saveLocalConversations([]);
+    const client = getSupabaseClient();
+    if (isSupabaseConfigured() && client) {
+      client.auth
+        .getUser()
+        .then(({ data }) => {
+          const user = data?.user;
+          if (user) {
+            Promise.resolve(client.from('conversations').delete().eq('user_id', user.id))
+              .then(() => {})
+              .catch(() => {});
+          }
+        })
+        .catch(() => {});
+    }
   },
 };

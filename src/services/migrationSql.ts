@@ -1,6 +1,6 @@
--- ==============================================================================
+// Complete PostgreSQL + Supabase migration script
+export const SUPABASE_MIGRATION_SQL = `-- ==============================================================================
 -- MEMORY AI: Complete Database Schema Migration
--- Matches Build Specification Section 4
 -- ==============================================================================
 
 -- 1. PROFILES
@@ -52,7 +52,7 @@ create index if not exists idx_memories_user_id on public.memories(user_id);
 create index if not exists idx_memories_created_at on public.memories(created_at desc);
 create index if not exists idx_memories_category on public.memories(category);
 
--- 4. NOTES (manual notes; the searchable text representation is indexed in File Search)
+-- 4. NOTES (searchable text representation)
 create table if not exists public.notes (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users on delete cascade,
@@ -172,3 +172,4 @@ create policy "Allow authenticated users to delete their own files"
 on storage.objects for delete
 to authenticated
 using (bucket_id = 'memory-files' and (storage.foldername(name))[1] = auth.uid()::text);
+`;

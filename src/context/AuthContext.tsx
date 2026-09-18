@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { getSupabaseClient, isSupabaseConfigured } from '../lib/supabase';
 import { User, Session } from '@supabase/supabase-js';
 
 interface AuthContextType {
@@ -7,10 +7,17 @@ interface AuthContextType {
   session: Session | null;
   isLoading: boolean;
   isDemoUser: boolean;
+  isSupabaseActive: boolean;
   signIn: (email: string, password?: string) => Promise<{ error?: string }>;
-  signUp: (email: string, password?: string, displayName?: string) => Promise<{ error?: string }>;
+  signUp: (
+    email: string,
+    password?: string,
+    displayName?: string
+  ) => Promise<{ error?: string; requiresEmailVerification?: boolean }>;
   signOut: () => Promise<void>;
+  resetPassword: (email: string) => Promise<{ error?: string; success?: boolean }>;
   enableDemoUser: () => void;
+  refreshSession: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -32,47 +39,98 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isDemoUser, setIsDemoUser] = useState(false);
+  const [supabaseActive, setSupabaseActive] = useState(isSupabaseConfigured());
 
-  useEffect(() => {
-    if (isSupabaseConfigured && supabase) {
-      // Supabase Auth listener
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        setIsLoading(false);
-      });
+  const syncAuthState = useCallback(async () => {
+    const configured = isSupabaseConfigured();
+    setSupabaseActive(configured);
 
-      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        setIsLoading(false);
-      });
-
-      return () => subscription.unsubscribe();
-    } else {
-      // Local demo mode: check if previously logged in
-      const savedAuth = localStorage.getItem('memory_ai_auth_state');
-      if (savedAuth === 'true') {
-        setUser(DEMO_USER_OBJ);
-        setIsDemoUser(true);
+    const client = getSupabaseClient();
+    if (configured && client) {
+      try {
+        const { data: { session } } = await client.auth.getSession();
+        if (session) {
+          setSession(session);
+          setUser(session.user);
+          setIsDemoUser(false);
+          setIsLoading(false);
+          return;
+        }
+      } catch (err) {
+        console.warn('Error fetching Supabase session:', err);
       }
-      setIsLoading(false);
     }
+
+    // Fallback: check demo user session
+    const savedAuth = localStorage.getItem('memory_ai_auth_state');
+    if (savedAuth === 'true') {
+      setUser(DEMO_USER_OBJ);
+      setIsDemoUser(true);
+    } else {
+      setUser(null);
+      setIsDemoUser(false);
+      setSession(null);
+    }
+    setIsLoading(false);
   }, []);
 
-  const signIn = async (email: string, password?: string) => {
-    if (isSupabaseConfigured && supabase && password) {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) return { error: error.message };
-      setUser(data.user);
-      setSession(data.session);
-      return {};
+  useEffect(() => {
+    syncAuthState();
+
+    const client = getSupabaseClient();
+    let unsubscribe: (() => void) | undefined;
+
+    if (client) {
+      const { data: { subscription } } = client.auth.onAuthStateChange((_event, newSession) => {
+        setSession(newSession);
+        setUser(newSession?.user ?? null);
+        if (newSession) {
+          setIsDemoUser(false);
+          localStorage.removeItem('memory_ai_auth_state');
+        }
+        setIsLoading(false);
+      });
+      unsubscribe = () => subscription.unsubscribe();
+    }
+
+    // Listen to custom configuration changes from Settings
+    const handleConfigChange = () => {
+      syncAuthState();
+    };
+
+    window.addEventListener('supabase-config-changed', handleConfigChange);
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+      window.removeEventListener('supabase-config-changed', handleConfigChange);
+    };
+  }, [syncAuthState]);
+
+  const signIn = async (email: string, password?: string): Promise<{ error?: string }> => {
+    const client = getSupabaseClient();
+
+    if (isSupabaseConfigured() && client && password) {
+      try {
+        const { data, error } = await client.auth.signInWithPassword({
+          email: email.trim(),
+          password,
+        });
+        if (error) return { error: error.message };
+
+        setUser(data.user);
+        setSession(data.session);
+        setIsDemoUser(false);
+        localStorage.removeItem('memory_ai_auth_state');
+        return {};
+      } catch (err: any) {
+        return { error: err?.message || 'Authentication error occurred.' };
+      }
     }
 
     // Demo sign in
     const demoUser = {
       ...DEMO_USER_OBJ,
-      email: email || DEMO_USER_OBJ.email,
+      email: email.trim() || DEMO_USER_OBJ.email,
       user_metadata: { full_name: email.split('@')[0] || 'Aayush' },
     };
     setUser(demoUser);
@@ -81,25 +139,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return {};
   };
 
-  const signUp = async (email: string, password?: string, displayName?: string) => {
-    if (isSupabaseConfigured && supabase && password) {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: { full_name: displayName || email.split('@')[0] },
-        },
-      });
-      if (error) return { error: error.message };
-      setUser(data.user);
-      setSession(data.session);
-      return {};
+  const signUp = async (
+    email: string,
+    password?: string,
+    displayName?: string
+  ): Promise<{ error?: string; requiresEmailVerification?: boolean }> => {
+    const client = getSupabaseClient();
+
+    if (isSupabaseConfigured() && client && password) {
+      try {
+        const { data, error } = await client.auth.signUp({
+          email: email.trim(),
+          password,
+          options: {
+            data: { full_name: displayName || email.split('@')[0] },
+          },
+        });
+        if (error) return { error: error.message };
+
+        if (!data.session && data.user) {
+          // Email confirmation is enabled in Supabase
+          return { requiresEmailVerification: true };
+        }
+
+        setUser(data.user);
+        setSession(data.session);
+        setIsDemoUser(false);
+        localStorage.removeItem('memory_ai_auth_state');
+        return {};
+      } catch (err: any) {
+        return { error: err?.message || 'Registration error occurred.' };
+      }
     }
 
     // Demo sign up
     const demoUser = {
       ...DEMO_USER_OBJ,
-      email: email || DEMO_USER_OBJ.email,
+      email: email.trim() || DEMO_USER_OBJ.email,
       user_metadata: { full_name: displayName || email.split('@')[0] },
     };
     setUser(demoUser);
@@ -109,13 +185,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
-    if (isSupabaseConfigured && supabase) {
-      await supabase.auth.signOut();
+    const client = getSupabaseClient();
+    if (client && isSupabaseConfigured()) {
+      try {
+        await client.auth.signOut();
+      } catch (err) {
+        console.warn('Error signing out of Supabase:', err);
+      }
     }
     setUser(null);
     setSession(null);
     setIsDemoUser(false);
     localStorage.removeItem('memory_ai_auth_state');
+  };
+
+  const resetPassword = async (email: string): Promise<{ error?: string; success?: boolean }> => {
+    const client = getSupabaseClient();
+    if (isSupabaseConfigured() && client) {
+      try {
+        const { error } = await client.auth.resetPasswordForEmail(email.trim(), {
+          redirectTo: window.location.origin + '/login?reset=true',
+        });
+        if (error) return { error: error.message };
+        return { success: true };
+      } catch (err: any) {
+        return { error: err?.message || 'Failed to send password reset email.' };
+      }
+    }
+    return { error: 'Supabase is not configured yet. Add your Project URL & Anon Key in Settings.' };
   };
 
   const enableDemoUser = () => {
@@ -124,8 +221,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.setItem('memory_ai_auth_state', 'true');
   };
 
+  const refreshSession = async () => {
+    await syncAuthState();
+  };
+
   return (
-    <AuthContext.Provider value={{ user, session, isLoading, isDemoUser, signIn, signUp, signOut, enableDemoUser }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        session,
+        isLoading,
+        isDemoUser,
+        isSupabaseActive: supabaseActive,
+        signIn,
+        signUp,
+        signOut,
+        resetPassword,
+        enableDemoUser,
+        refreshSession,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
