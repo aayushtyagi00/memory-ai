@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { api } from '../services/api';
+import { api, formatStorageSize, USER_STORAGE_CAP_BYTES } from '../services/api';
+import { UserStats } from '../types';
 import { geminiService, SUPPORTED_MODELS, DEFAULT_MODEL } from '../services/gemini';
 import {
   User,
@@ -28,7 +29,14 @@ export const SettingsPage: React.FC = () => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
 
-  const [stats, setStats] = useState({ total: 0, documents: 0, notes: 0, images: 0 });
+  const [stats, setStats] = useState<UserStats>({
+    total: 0,
+    documents: 0,
+    notes: 0,
+    images: 0,
+    storageBytes: 0,
+    storageLimitBytes: USER_STORAGE_CAP_BYTES,
+  });
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [copiedUserId, setCopiedUserId] = useState(false);
 
@@ -107,6 +115,11 @@ export const SettingsPage: React.FC = () => {
   const authProvider = user?.app_metadata?.provider || (user?.email?.endsWith('@gmail.com') ? 'Google' : 'Supabase Auth');
   const userDisplayName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User';
 
+  const storageUsed = stats.storageBytes || 0;
+  const storageCap = stats.storageLimitBytes || USER_STORAGE_CAP_BYTES;
+  const storagePercent = (storageUsed / storageCap) * 100;
+  const storageFree = Math.max(0, storageCap - storageUsed);
+
   return (
     <div className="p-4 md:p-8 max-w-[900px] w-full mx-auto flex flex-col gap-8">
       <div>
@@ -145,12 +158,39 @@ export const SettingsPage: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-          <div className="p-3.5 rounded-xl bg-bg-base border border-border flex flex-col gap-1">
-            <span className="text-[10px] font-mono text-text-muted uppercase">Authentication Provider</span>
-            <span className="text-xs font-medium text-text-primary flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              <span>{authProvider === 'google' ? 'Google OAuth 2.0 (Verified)' : 'Supabase Auth (Encrypted)'}</span>
-            </span>
+          {/* Storage Used Box with 5 GB Cap */}
+          <div className="p-3.5 rounded-xl bg-bg-base border border-border flex flex-col justify-between gap-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-mono text-text-muted uppercase flex items-center gap-1.5">
+                <HardDrive className="w-3.5 h-3.5 text-accent" />
+                <span>Vault Storage Used</span>
+              </span>
+              <span className="font-mono text-[10px] px-2 py-0.5 rounded-full bg-accent-soft text-accent border border-accent/20 font-semibold">
+                {storagePercent < 0.01 ? '< 0.01%' : `${storagePercent.toFixed(2)}%`} of 5 GB
+              </span>
+            </div>
+
+            <div className="flex items-baseline justify-between">
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-sm font-bold text-text-primary">
+                  {formatStorageSize(storageUsed)}
+                </span>
+                <span className="text-xs text-text-muted font-mono">
+                  / {formatStorageSize(storageCap)}
+                </span>
+              </div>
+              <span className="text-[11px] text-emerald-400 font-mono">
+                {formatStorageSize(storageFree)} free
+              </span>
+            </div>
+
+            {/* Storage Progress Bar */}
+            <div className="w-full h-1.5 bg-bg-elevated rounded-full overflow-hidden border border-border/70">
+              <div
+                className="h-full bg-gradient-to-r from-accent to-emerald-400 rounded-full transition-all duration-500"
+                style={{ width: `${Math.min(100, Math.max(storagePercent, 0.8))}%` }}
+              />
+            </div>
           </div>
 
           <div className="p-3.5 rounded-xl bg-bg-base border border-border flex flex-col gap-1">
@@ -394,15 +434,46 @@ export const SettingsPage: React.FC = () => {
       </div>
 
       {/* 4. Vault Storage Overview */}
-      <div className="p-6 rounded-2xl bg-bg-elevated border border-border shadow-surface flex flex-col gap-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <BookOpen className="w-4 h-4 text-accent" />
-            <h2 className="text-sm font-bold text-text-primary">Vault Storage Summary</h2>
+      <div className="p-6 rounded-2xl bg-bg-elevated border border-border shadow-surface flex flex-col gap-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border pb-4">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-accent-soft border border-accent/30 flex items-center justify-center text-accent">
+              <BookOpen className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-text-primary flex items-center gap-2">
+                <span>Vault Storage Overview</span>
+                <span className="font-mono text-[9px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 uppercase font-semibold">
+                  5 GB User Quota
+                </span>
+              </h2>
+              <p className="text-[11px] text-text-muted mt-0.5">
+                {formatStorageSize(storageUsed)} of {formatStorageSize(storageCap)} used ({stats.total} memories indexed)
+              </p>
+            </div>
           </div>
-          <span className="font-mono text-xs text-text-muted">
-            {stats.total} total indexed memories
-          </span>
+
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-xs text-text-secondary">
+              {formatStorageSize(storageFree)} available
+            </span>
+          </div>
+        </div>
+
+        {/* Global Quota Bar */}
+        <div className="flex flex-col gap-1.5 p-3.5 rounded-xl bg-bg-base border border-border">
+          <div className="flex justify-between text-[11px] font-mono">
+            <span className="text-text-muted">Capacity</span>
+            <span className="text-text-primary font-semibold">
+              {storagePercent < 0.01 ? '< 0.01%' : `${storagePercent.toFixed(2)}%`} of 5.00 GB
+            </span>
+          </div>
+          <div className="w-full h-2 bg-bg-elevated rounded-full overflow-hidden border border-border/70">
+            <div
+              className="h-full bg-gradient-to-r from-accent via-emerald-400 to-emerald-500 rounded-full transition-all duration-500"
+              style={{ width: `${Math.min(100, Math.max(storagePercent, 0.5))}%` }}
+            />
+          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">

@@ -70,18 +70,36 @@ function saveLocalReminders(reminders: Reminder[]) {
   }
 }
 
+export const USER_STORAGE_CAP_BYTES = 5 * 1024 * 1024 * 1024; // 5 GB
+
+export function formatStorageSize(bytes: number): string {
+  if (!bytes || bytes <= 0) return '0 B';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
+
 export const api = {
   async getStats(): Promise<UserStats> {
     const client = getSupabaseClient();
     if (isSupabaseConfigured() && client) {
       try {
-        const { data, error } = await client.from('memories').select('type');
+        const { data, error } = await client.from('memories').select('type, file_size, content');
         if (!error && data) {
+          const storageBytes = data.reduce((acc, m) => {
+            const size = typeof m.file_size === 'number' && m.file_size > 0
+              ? m.file_size
+              : (m.content ? new Blob([m.content]).size : 0);
+            return acc + size;
+          }, 0);
           return {
             total: data.length,
             documents: data.filter((m) => m.type === 'document').length,
             notes: data.filter((m) => m.type === 'note').length,
             images: data.filter((m) => m.type === 'image').length,
+            storageBytes,
+            storageLimitBytes: USER_STORAGE_CAP_BYTES,
           };
         }
       } catch (err) {
@@ -89,11 +107,19 @@ export const api = {
       }
     }
     const mems = getLocalMemories();
+    const storageBytes = mems.reduce((acc, m) => {
+      const size = typeof m.file_size === 'number' && m.file_size > 0
+        ? m.file_size
+        : (m.content ? new Blob([m.content]).size : 0);
+      return acc + size;
+    }, 0);
     return {
       total: mems.length,
       documents: mems.filter((m) => m.type === 'document').length,
       notes: mems.filter((m) => m.type === 'note').length,
       images: mems.filter((m) => m.type === 'image').length,
+      storageBytes,
+      storageLimitBytes: USER_STORAGE_CAP_BYTES,
     };
   },
 
@@ -139,6 +165,14 @@ export const api = {
     category = 'General',
     tags: string[] = []
   ): Promise<Memory> {
+    // Check 5 GB storage cap
+    const currentStats = await this.getStats();
+    if ((currentStats.storageBytes || 0) + file.size > USER_STORAGE_CAP_BYTES) {
+      throw new Error(
+        `Storage cap exceeded: Uploading "${file.name}" (${(file.size / (1024 * 1024)).toFixed(1)} MB) would exceed your 5 GB user vault limit. Please delete existing memories to free up space.`
+      );
+    }
+
     const client = getSupabaseClient();
     const mimeType = file.type || 'application/octet-stream';
     const isImage = mimeType.startsWith('image/');
@@ -275,6 +309,15 @@ export const api = {
     category = 'Personal',
     tags: string[] = []
   ): Promise<Memory> {
+    // Check 5 GB storage cap
+    const noteBytes = new Blob([content]).size;
+    const currentStats = await this.getStats();
+    if ((currentStats.storageBytes || 0) + noteBytes > USER_STORAGE_CAP_BYTES) {
+      throw new Error(
+        'Storage cap exceeded: Saving this note would exceed your 5 GB user vault limit. Please delete existing memories to free up space.'
+      );
+    }
+
     const client = getSupabaseClient();
     const safeTitle = title.trim();
     const fileName = `${safeTitle.replace(/[^\w\.\-\s]/gi, '_')}.txt`;

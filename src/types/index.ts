@@ -116,4 +116,6 @@ export interface UserStats {
   documents: number;
   notes: number;
   images: number;
+  storageBytes?: number;
+  storageLimitBytes?: number;
 }
