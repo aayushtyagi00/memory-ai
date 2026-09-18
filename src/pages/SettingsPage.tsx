@@ -47,10 +47,7 @@ export const SettingsPage: React.FC = () => {
   const [testResult, setTestResult] = useState<{ success: boolean; latencyMs: number; error?: string } | null>(null);
   const [saveKeySuccess, setSaveKeySuccess] = useState(false);
 
-  // Supabase Configuration State
-  const [supabaseUrl, setSupabaseUrl] = useState('');
-  const [supabaseAnonKey, setSupabaseAnonKey] = useState('');
-  const [showSupabaseKey, setShowSupabaseKey] = useState(false);
+  // Supabase Status State
   const [isTestingSupabase, setIsTestingSupabase] = useState(false);
   const [supabaseTestResult, setSupabaseTestResult] = useState<{
     success: boolean;
@@ -58,7 +55,6 @@ export const SettingsPage: React.FC = () => {
     error?: string;
     details?: string;
   } | null>(null);
-  const [saveSupabaseSuccess, setSaveSupabaseSuccess] = useState(false);
   const [showSqlGuide, setShowSqlGuide] = useState(false);
   const [sqlCopied, setSqlCopied] = useState(false);
 
@@ -68,11 +64,6 @@ export const SettingsPage: React.FC = () => {
     const existingKey = geminiService.getApiKey();
     if (existingKey) setApiKey(existingKey);
     setSelectedModel(geminiService.getModel());
-
-    // Load existing Supabase config
-    const supaConfig = getSupabaseConfig();
-    if (supaConfig.url) setSupabaseUrl(supaConfig.url);
-    if (supaConfig.anonKey) setSupabaseAnonKey(supaConfig.anonKey);
   }, []);
 
   const loadStats = async () => {
@@ -108,21 +99,12 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
-  const handleSaveSupabaseConfig = () => {
-    setSupabaseConfig(supabaseUrl.trim(), supabaseAnonKey.trim());
-    setSaveSupabaseSuccess(true);
-    setTimeout(() => setSaveSupabaseSuccess(false), 3000);
-  };
-
   const handleTestSupabaseConfig = async () => {
     setIsTestingSupabase(true);
     setSupabaseTestResult(null);
     try {
-      const res = await testSupabaseConnection(supabaseUrl.trim(), supabaseAnonKey.trim());
+      const res = await testSupabaseConnection();
       setSupabaseTestResult(res);
-      if (res.success) {
-        setSupabaseConfig(supabaseUrl.trim(), supabaseAnonKey.trim());
-      }
     } catch (err: any) {
       setSupabaseTestResult({
         success: false,
@@ -174,12 +156,12 @@ export const SettingsPage: React.FC = () => {
       <div>
         <h1 className="text-xl sm:text-2xl font-bold text-text-primary">Settings</h1>
         <p className="text-xs text-text-secondary mt-1">
-          Configure real Supabase authentication &amp; database, Google Gemini AI intelligence, and memory storage.
+          Configure Google Gemini AI intelligence, view backend database status, and manage memory storage.
         </p>
       </div>
 
-      {/* 1. Supabase Backend Configuration Card */}
-      <div className="p-6 rounded-2xl bg-gradient-to-b from-bg-elevated to-surface-container-low border border-border shadow-surface flex flex-col gap-6 relative overflow-hidden">
+      {/* 1. Supabase Backend Status Card (Configured via .env on the backend) */}
+      <div className="p-6 rounded-2xl bg-gradient-to-b from-bg-elevated to-surface-container-low border border-border shadow-surface flex flex-col gap-5 relative overflow-hidden">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border pb-4">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
@@ -187,13 +169,13 @@ export const SettingsPage: React.FC = () => {
             </div>
             <div>
               <h2 className="text-sm font-bold text-text-primary flex items-center gap-2">
-                <span>Supabase Real Authentication &amp; Database</span>
+                <span>Database &amp; Authentication Backend</span>
                 <span className="font-mono text-[9px] px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 font-semibold border border-emerald-500/30 uppercase">
-                  PostgreSQL + RLS
+                  Supabase PostgreSQL
                 </span>
               </h2>
               <p className="text-[11px] text-text-muted mt-0.5">
-                Enable multi-user authentication, PostgreSQL row-level security, and cloud storage bucket sync.
+                Backend connection is configured via server environment variables (<code className="font-mono text-emerald-400">.env</code>).
               </p>
             </div>
           </div>
@@ -211,88 +193,44 @@ export const SettingsPage: React.FC = () => {
                   hasConfiguredSupabase ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
                 }`}
               />
-              {hasConfiguredSupabase ? 'Supabase Active & Synced' : 'Local Storage Mode'}
+              {hasConfiguredSupabase ? 'Supabase Connected' : 'Local Offline Mode'}
             </span>
           </div>
         </div>
 
-        {/* Project URL */}
-        <div className="flex flex-col gap-2">
-          <label className="text-xs font-semibold text-text-primary flex items-center justify-between">
-            <span>Supabase Project URL</span>
-            <a
-              href="https://supabase.com/dashboard"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[11px] font-mono text-emerald-400 hover:underline inline-flex items-center gap-1"
-            >
-              <span>Open Supabase Dashboard</span>
-              <ExternalLink className="w-3 h-3" />
-            </a>
-          </label>
-          <input
-            type="text"
-            value={supabaseUrl}
-            onChange={(e) => setSupabaseUrl(e.target.value)}
-            placeholder="https://your-project-id.supabase.co"
-            className="w-full bg-bg-base border border-border rounded-xl px-4 py-2.5 text-xs text-text-primary font-mono placeholder:text-text-muted focus:outline-none focus:border-emerald-500"
-          />
-        </div>
+        {/* Backend Info & Status */}
+        <div className="p-4 rounded-xl bg-bg-base border border-border flex flex-col gap-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex flex-col gap-0.5">
+              <span className="text-xs font-semibold text-text-primary">
+                {hasConfiguredSupabase ? 'PostgreSQL Database & Auth Active' : 'Running in Offline / Local Demo Mode'}
+              </span>
+              <span className="text-[11px] text-text-muted">
+                {hasConfiguredSupabase
+                  ? 'Connected to your remote Supabase instance. User authentication, Row Level Security, and memory tables are active.'
+                  : 'No Supabase credentials detected in .env. The app is running smoothly using client-side isolated local storage.'}
+              </span>
+            </div>
 
-        {/* Anon Key */}
-        <div className="flex flex-col gap-2">
-          <label className="text-xs font-semibold text-text-primary">
-            <span>Supabase Anon Public Key</span>
-          </label>
-          <div className="relative flex items-center">
-            <input
-              type={showSupabaseKey ? 'text' : 'password'}
-              value={supabaseAnonKey}
-              onChange={(e) => setSupabaseAnonKey(e.target.value)}
-              placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-              className="w-full bg-bg-base border border-border rounded-xl pl-4 pr-12 py-2.5 text-xs text-text-primary font-mono placeholder:text-text-muted focus:outline-none focus:border-emerald-500"
-            />
-            <button
-              type="button"
-              onClick={() => setShowSupabaseKey(!showSupabaseKey)}
-              className="absolute right-3 p-1 text-text-muted hover:text-text-primary transition-colors"
-            >
-              {showSupabaseKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-            </button>
-          </div>
-          <span className="text-[10px] text-text-muted">
-            Found in your Supabase project under: <strong>Project Settings &gt; API &gt; Project API keys (anon public)</strong>
-          </span>
-        </div>
-
-        {/* Buttons Row */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={handleTestSupabaseConfig}
-              disabled={isTestingSupabase || !supabaseUrl.trim() || !supabaseAnonKey.trim()}
-              className="px-4 py-2 rounded-lg bg-bg-hover hover:bg-surface-container-high border border-border text-xs font-medium text-text-primary disabled:opacity-40 flex items-center gap-2 transition-all"
-            >
-              <Activity className={`w-3.5 h-3.5 text-emerald-400 ${isTestingSupabase ? 'animate-spin' : ''}`} />
-              <span>{isTestingSupabase ? 'Testing Connection...' : 'Test Connection'}</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleSaveSupabaseConfig}
-              className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium active:scale-95 transition-all shadow-[0_0_12px_rgba(16,185,129,0.25)] flex items-center gap-1.5"
-            >
-              <Check className="w-3.5 h-3.5" />
-              <span>Save Supabase Configuration</span>
-            </button>
+            {hasConfiguredSupabase && (
+              <button
+                type="button"
+                onClick={handleTestSupabaseConfig}
+                disabled={isTestingSupabase}
+                className="px-3.5 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-xs font-medium flex items-center gap-1.5 transition-all shrink-0"
+              >
+                <Activity className={`w-3.5 h-3.5 ${isTestingSupabase ? 'animate-spin' : ''}`} />
+                <span>{isTestingSupabase ? 'Pinging...' : 'Ping Database'}</span>
+              </button>
+            )}
           </div>
 
-          {saveSupabaseSuccess && (
-            <span className="font-mono text-xs text-emerald-400 flex items-center gap-1.5 animate-fade-in">
-              <CheckCircle2 className="w-4 h-4" />
-              Supabase configuration saved!
-            </span>
+          {!hasConfiguredSupabase && (
+            <div className="mt-2 p-3 rounded-lg bg-surface-container-high border border-border text-[11px] font-mono text-text-secondary flex flex-col gap-1">
+              <span className="text-text-primary font-semibold">To connect your Supabase backend:</span>
+              <span>1. Add <code className="text-emerald-400">VITE_SUPABASE_URL</code> and <code className="text-emerald-400">VITE_SUPABASE_ANON_KEY</code> to your <code className="text-text-primary">.env</code> file.</span>
+              <span>2. Run the database migration in the Supabase SQL editor using the schema button below.</span>
+            </div>
           )}
         </div>
 
