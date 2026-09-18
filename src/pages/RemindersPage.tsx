@@ -73,11 +73,19 @@ export const RemindersPage: React.FC = () => {
     e.preventDefault();
     if (!title.trim()) return;
 
+    let safeIsoDue: string | undefined = undefined;
+    if (dueDate) {
+      const parsed = new Date(dueDate);
+      if (!isNaN(parsed.getTime())) {
+        safeIsoDue = parsed.toISOString();
+      }
+    }
+
     try {
       const newRem = await api.createReminder(
-        title,
-        description,
-        dueDate ? new Date(dueDate).toISOString() : undefined
+        title.trim(),
+        description.trim() || undefined,
+        safeIsoDue
       );
       setReminders((prev) => [newRem, ...prev]);
       setIsModalOpen(false);
@@ -290,7 +298,7 @@ export const RemindersPage: React.FC = () => {
                     )}
 
                     <div className="flex flex-wrap items-center gap-3 mt-2 font-mono text-[10px] text-text-muted">
-                      {rem.due_at && (
+                      {rem.due_at && !isNaN(new Date(rem.due_at).getTime()) && (
                         <span
                           className={`flex items-center gap-1 ${
                             isOverdue ? 'text-red-400 font-semibold' : ''

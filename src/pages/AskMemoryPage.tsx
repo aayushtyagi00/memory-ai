@@ -181,7 +181,7 @@ export const AskMemoryPage: React.FC = () => {
       let convId = currentConversationId;
       let convTitle = '';
       if (!convId) {
-        convId = 'conv-' + Date.now();
+        convId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : 'conv-' + Date.now();
         convTitle = query.slice(0, 36) + (query.length > 36 ? '...' : '');
         setCurrentConversationId(convId);
       } else {

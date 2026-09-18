@@ -22,7 +22,8 @@ import {
   Save,
   X,
   Bell,
-  Activity
+  Activity,
+  ExternalLink
 } from 'lucide-react';
 
 const CATEGORIES = ['Academic', 'Financial', 'Career', 'Personal', 'Meeting', 'General'];
@@ -32,6 +33,7 @@ export const MemoryDetailPage: React.FC = () => {
   const navigate = useNavigate();
 
   const [memory, setMemory] = useState<Memory | null>(null);
+  const [fileUrl, setFileUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [reminders, setReminders] = useState<Reminder[]>([]);
 
@@ -70,6 +72,14 @@ export const MemoryDetailPage: React.FC = () => {
         setEditTags(data.tags || []);
         setEditContent(data.content || data.description || '');
         setReminders(allReminders.filter((r) => r.source_memory_id === memId));
+
+        if (data.storage_path) {
+          api.getFileUrl(data.storage_path).then((url) => {
+            setFileUrl(url);
+          }).catch(() => {});
+        } else {
+          setFileUrl(null);
+        }
       }
     } catch (err) {
       console.error('Failed to load memory:', err);
@@ -226,6 +236,19 @@ ${memory.content || memory.description || ''}`;
             <span>Ask About This</span>
           </button>
 
+          {fileUrl && (
+            <a
+              href={fileUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs font-medium text-text-primary bg-bg-elevated hover:bg-bg-hover px-3 py-2 rounded-lg border border-border transition-all flex items-center gap-1.5"
+              title="Open or download original file"
+            >
+              <ExternalLink className="w-3.5 h-3.5 text-accent" />
+              <span>Open Attachment</span>
+            </a>
+          )}
+
           <button
             onClick={handleDelete}
             title="Delete Memory"
@@ -255,11 +278,11 @@ ${memory.content || memory.description || ''}`;
       )}
 
       {/* Image Preview (if image) */}
-      {memory.type === 'image' && memory.storage_path && (
+      {memory.type === 'image' && (fileUrl || memory.storage_path) && (
         <div className="p-4 rounded-2xl bg-bg-elevated border border-border flex flex-col items-center">
           <div className="max-h-96 rounded-xl overflow-hidden border border-border shadow-md">
             <img
-              src={memory.storage_path}
+              src={fileUrl || memory.storage_path || ''}
               alt={memory.title}
               className="max-h-96 w-auto object-contain"
             />

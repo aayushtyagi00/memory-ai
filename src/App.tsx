@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { AppLayout } from './components/layout/AppLayout';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { LandingPage } from './pages/LandingPage';
 import { AuthPage } from './pages/AuthPage';
 import { DashboardPage } from './pages/DashboardPage';
@@ -33,35 +34,37 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 
 export const App: React.FC = () => {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          {/* Public Routes */}
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/login" element={<AuthPage />} />
+    <ErrorBoundary>
+      <AuthProvider>
+        <BrowserRouter>
+          <Routes>
+            {/* Public Routes */}
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/login" element={<AuthPage />} />
 
-          {/* Authenticated Routes wrapped in AppLayout */}
-          <Route
-            element={
-              <ProtectedRoute>
-                <AppLayout />
-              </ProtectedRoute>
-            }
-          >
-            <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/add" element={<AddMemoryPage />} />
-            <Route path="/ask" element={<AskMemoryPage />} />
-            <Route path="/memories" element={<MemoryLibraryPage />} />
-            <Route path="/memories/:id" element={<MemoryDetailPage />} />
-            <Route path="/timeline" element={<TimelinePage />} />
-            <Route path="/reminders" element={<RemindersPage />} />
-            <Route path="/settings" element={<SettingsPage />} />
-          </Route>
+            {/* Authenticated Routes wrapped in AppLayout */}
+            <Route
+              element={
+                <ProtectedRoute>
+                  <AppLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/add" element={<AddMemoryPage />} />
+              <Route path="/ask" element={<AskMemoryPage />} />
+              <Route path="/memories" element={<MemoryLibraryPage />} />
+              <Route path="/memories/:id" element={<MemoryDetailPage />} />
+              <Route path="/timeline" element={<TimelinePage />} />
+              <Route path="/reminders" element={<RemindersPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
+            </Route>
 
-          {/* Catch-all */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </BrowserRouter>
-    </AuthProvider>
+            {/* Catch-all */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </BrowserRouter>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 };

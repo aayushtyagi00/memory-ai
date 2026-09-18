@@ -159,6 +159,32 @@ export const api = {
     return mems.find((m) => m.id === id) || null;
   },
 
+  async getFileUrl(storagePath?: string | null): Promise<string | null> {
+    if (!storagePath) return null;
+    if (
+      storagePath.startsWith('data:') ||
+      storagePath.startsWith('http://') ||
+      storagePath.startsWith('https://') ||
+      storagePath.startsWith('blob:')
+    ) {
+      return storagePath;
+    }
+    const client = getSupabaseClient();
+    if (isSupabaseConfigured() && client) {
+      try {
+        const { data, error } = await client.storage
+          .from('memory-files')
+          .createSignedUrl(storagePath, 3600);
+        if (!error && data?.signedUrl) {
+          return data.signedUrl;
+        }
+      } catch (e) {
+        console.warn('Failed to generate signed URL for storage path:', storagePath, e);
+      }
+    }
+    return null;
+  },
+
   async uploadMemory(
     file: File,
     title?: string,
@@ -433,23 +459,28 @@ export const api = {
   async askMemory(question: string, _conversationId?: string): Promise<AskResponse> {
     // 1. Fetch available memories (either from Supabase or Local)
     let memories: Memory[] = [];
+    let isSupabaseUser = false;
     const client = getSupabaseClient();
 
     if (isSupabaseConfigured() && client) {
       try {
-        const { data, error } = await client
-          .from('memories')
-          .select('*')
-          .order('created_at', { ascending: false });
-        if (!error && data && data.length > 0) {
-          memories = data as Memory[];
+        const { data: userData } = await client.auth.getUser();
+        if (userData?.user) {
+          isSupabaseUser = true;
+          const { data, error } = await client
+            .from('memories')
+            .select('*')
+            .order('created_at', { ascending: false });
+          if (!error && data) {
+            memories = data as Memory[];
+          }
         }
       } catch (e) {
         console.warn('Supabase memories fetch for Ask failed:', e);
       }
     }
 
-    if (memories.length === 0) {
+    if (!isSupabaseUser) {
       memories = getLocalMemories();
     }
 
@@ -463,7 +494,7 @@ export const api = {
       }
     }
 
-    // 3. Fallback grounded semantic evaluation (offline demo & benchmark questions)
+    // 3. Fallback grounded semantic evaluation
     const qLower = question.toLowerCase().trim();
 
     if (memories.length === 0) {
@@ -475,147 +506,149 @@ export const api = {
       };
     }
 
-    // Benchmark test queries
-    // 1. DBMS Exam query
-    if (qLower.includes('dbms') || (qLower.includes('exam') && !qLower.includes('hostel'))) {
-      const mem = memories.find((m) => m.original_file_name?.includes('exam_schedule') || m.content?.includes('DBMS examination'));
-      return {
-        answer: "Your Database Management Systems (DBMS) examination is scheduled for 24 September 2026 at 10:00 AM in Examination Hall 3, Block B.",
-        sources: mem ? [{
-          id: mem.id,
-          memoryId: mem.id,
-          title: mem.title,
-          fileName: mem.original_file_name || 'exam_schedule.pdf',
-          type: 'document',
-          citation: 'exam_schedule.pdf',
-          snippet: 'Course: Database Management Systems (CS-401)\nDBMS examination: 24 September 2026, 10:00 AM\nVenue: Examination Hall 3, Block B',
-        }] : [],
-        foundInformation: true,
-        conflictDetected: false,
-      };
-    }
-
-    // 2. Hostel Payment query
-    if (qLower.includes('hostel') || (qLower.includes('paid') && qLower.includes('room'))) {
-      const mem = memories.find((m) => m.original_file_name?.includes('hostel_receipt') || m.content?.includes('42,500'));
-      return {
-        answer: "You paid ₹42,500 for your campus hostel accommodation (Room 402, Ganga Hostel) for the Autumn Semester 2026. The payment is marked as PAID IN FULL via Net Banking (Ref: TXN94810294).",
-        sources: mem ? [{
-          id: mem.id,
-          memoryId: mem.id,
-          title: mem.title,
-          fileName: mem.original_file_name || 'hostel_receipt.pdf',
-          type: 'document',
-          citation: 'hostel_receipt.pdf',
-          snippet: 'Hostel payment: ₹42,500\nRoom: 402, Ganga Hostel\nPeriod: Autumn Semester (July - December 2026)\nPayment Status: PAID IN FULL',
-        }] : [],
-        foundInformation: true,
-        conflictDetected: false,
-      };
-    }
-
-    // 3. Project presentation preparation / professor advice query
-    if (qLower.includes('project') && (qLower.includes('prepare') || qLower.includes('presentation') || qLower.includes('professor'))) {
-      const annMem = memories.find((m) => m.original_file_name?.includes('project_announcement'));
-      const profMem = memories.find((m) => m.original_file_name?.includes('professor_notes'));
-
-      const sources: Source[] = [];
-      if (annMem) {
-        sources.push({
-          id: annMem.id,
-          memoryId: annMem.id,
-          title: annMem.title,
-          fileName: annMem.original_file_name || 'project_announcement.pdf',
-          type: 'document',
-          citation: 'project_announcement.pdf',
-          snippet: 'Final-year project presentation: 27 September 2026, 11:30 AM. Each team must present project architecture, live software demonstration, and system metrics.',
-        });
-      }
-      if (profMem) {
-        sources.push({
-          id: profMem.id,
-          memoryId: profMem.id,
-          title: profMem.title,
-          fileName: profMem.original_file_name || 'professor_notes.txt',
-          type: 'note',
-          citation: 'professor_notes.txt',
-          snippet: 'Professor said prepare project architecture, database schema and demonstration. Emphasize the end-to-end grounded RAG pipeline visually.',
-        });
-      }
-
-      return {
-        answer: "For your final-year project presentation on 27 September 2026 at 11:30 AM (Seminar Room 102), you need to prepare the project architecture, database schema, live software demonstration, and system metrics. Slides must also be submitted 24 hours in advance.",
-        sources,
-        foundInformation: true,
-        conflictDetected: false,
-      };
-    }
-
-    // 4. Internship interview query
-    if (qLower.includes('internship') || qLower.includes('interview')) {
-      const mem = memories.find((m) => m.original_file_name?.includes('internship_offer'));
-      return {
-        answer: "Your technical interview for the Software Engineering Intern role at Nova Labs is scheduled for 20 September 2026 at 2:00 PM via Google Meet with Alex Rivera. The round will cover Technical System Design and Live Coding.",
-        sources: mem ? [{
-          id: mem.id,
-          memoryId: mem.id,
-          title: mem.title,
-          fileName: mem.original_file_name || 'internship_offer.pdf',
-          type: 'document',
-          citation: 'internship_offer.pdf',
-          snippet: 'Role: Software Engineering Intern (AI & Systems)\nInternship interview: 20 September 2026, 2:00 PM\nRound: Technical System Design & Live Coding.',
-        }] : [],
-        foundInformation: true,
-        conflictDetected: false,
-      };
-    }
-
-    // 5. Tuition / fee query
-    if (qLower.includes('tuition') || qLower.includes('fee')) {
-      const mem = memories.find((m) => m.original_file_name?.includes('fee_receipt'));
-      return {
-        answer: "According to your semester fee receipt, you paid a total of ₹80,000 (₹78,000 tuition fee + ₹2,000 exam fee) on 15 August 2026 under reference HDFC-ONLINE-84729103.",
-        sources: mem ? [{
-          id: mem.id,
-          memoryId: mem.id,
-          title: mem.title,
-          fileName: mem.original_file_name || 'fee_receipt.png',
-          type: 'image',
-          citation: 'fee_receipt.png',
-          snippet: 'Tuition Fee Paid: ₹78,000\nExam Fee: ₹2,000\nTotal Amount Paid: ₹80,000\nPayment Mode: HDFC Net Banking',
-        }] : [],
-        foundInformation: true,
-        conflictDetected: false,
-      };
-    }
-
-    // 6. Conflict detection demo
-    if (qLower.includes('conflict') || (qLower.includes('date') && qLower.includes('presentation') && qLower.includes('change'))) {
-      const annMem = memories.find((m) => m.original_file_name?.includes('project_announcement'));
-      return {
-        answer: "Sources conflict regarding the project presentation date: project_update_old.txt states it was scheduled for 25 September 2026, whereas project_announcement.pdf confirms it is on 27 September 2026 at 11:30 AM.",
-        sources: [
-          {
-            id: 'src-conflict-1',
-            title: 'Project Update (Archive)',
-            fileName: 'project_update_old.txt',
+    // Benchmark test queries (Only executed for offline/demo users to prevent leaking synthetic demo data)
+    if (!isSupabaseUser) {
+      // 1. DBMS Exam query
+      if (qLower.includes('dbms') || (qLower.includes('exam') && !qLower.includes('hostel'))) {
+        const mem = memories.find((m) => m.original_file_name?.includes('exam_schedule') || m.content?.includes('DBMS examination'));
+        return {
+          answer: "Your Database Management Systems (DBMS) examination is scheduled for 24 September 2026 at 10:00 AM in Examination Hall 3, Block B.",
+          sources: mem ? [{
+            id: mem.id,
+            memoryId: mem.id,
+            title: mem.title,
+            fileName: mem.original_file_name || 'exam_schedule.pdf',
             type: 'document',
-            citation: 'project_update_old.txt',
-            snippet: 'Project presentation tentative date: 25 September 2026.',
-          },
-          {
-            id: annMem?.id || 'src-conflict-2',
-            memoryId: annMem?.id,
-            title: annMem?.title || 'Project Announcement (Official)',
-            fileName: annMem?.original_file_name || 'project_announcement.pdf',
+            citation: 'exam_schedule.pdf',
+            snippet: 'Course: Database Management Systems (CS-401)\nDBMS examination: 24 September 2026, 10:00 AM\nVenue: Examination Hall 3, Block B',
+          }] : [],
+          foundInformation: true,
+          conflictDetected: false,
+        };
+      }
+
+      // 2. Hostel Payment query
+      if (qLower.includes('hostel') || (qLower.includes('paid') && qLower.includes('room'))) {
+        const mem = memories.find((m) => m.original_file_name?.includes('hostel_receipt') || m.content?.includes('42,500'));
+        return {
+          answer: "You paid ₹42,500 for your campus hostel accommodation (Room 402, Ganga Hostel) for the Autumn Semester 2026. The payment is marked as PAID IN FULL via Net Banking (Ref: TXN94810294).",
+          sources: mem ? [{
+            id: mem.id,
+            memoryId: mem.id,
+            title: mem.title,
+            fileName: mem.original_file_name || 'hostel_receipt.pdf',
+            type: 'document',
+            citation: 'hostel_receipt.pdf',
+            snippet: 'Hostel payment: ₹42,500\nRoom: 402, Ganga Hostel\nPeriod: Autumn Semester (July - December 2026)\nPayment Status: PAID IN FULL',
+          }] : [],
+          foundInformation: true,
+          conflictDetected: false,
+        };
+      }
+
+      // 3. Project presentation preparation / professor advice query
+      if (qLower.includes('project') && (qLower.includes('prepare') || qLower.includes('presentation') || qLower.includes('professor'))) {
+        const annMem = memories.find((m) => m.original_file_name?.includes('project_announcement'));
+        const profMem = memories.find((m) => m.original_file_name?.includes('professor_notes'));
+
+        const sources: Source[] = [];
+        if (annMem) {
+          sources.push({
+            id: annMem.id,
+            memoryId: annMem.id,
+            title: annMem.title,
+            fileName: annMem.original_file_name || 'project_announcement.pdf',
             type: 'document',
             citation: 'project_announcement.pdf',
-            snippet: 'Final-year project presentation: 27 September 2026, 11:30 AM.',
-          },
-        ],
-        foundInformation: true,
-        conflictDetected: true,
-      };
+            snippet: 'Final-year project presentation: 27 September 2026, 11:30 AM. Each team must present project architecture, live software demonstration, and system metrics.',
+          });
+        }
+        if (profMem) {
+          sources.push({
+            id: profMem.id,
+            memoryId: profMem.id,
+            title: profMem.title,
+            fileName: profMem.original_file_name || 'professor_notes.txt',
+            type: 'note',
+            citation: 'professor_notes.txt',
+            snippet: 'Professor said prepare project architecture, database schema and demonstration. Emphasize the end-to-end grounded RAG pipeline visually.',
+          });
+        }
+
+        return {
+          answer: "For your final-year project presentation on 27 September 2026 at 11:30 AM (Seminar Room 102), you need to prepare the project architecture, database schema, live software demonstration, and system metrics. Slides must also be submitted 24 hours in advance.",
+          sources,
+          foundInformation: true,
+          conflictDetected: false,
+        };
+      }
+
+      // 4. Internship interview query
+      if (qLower.includes('internship') || qLower.includes('interview')) {
+        const mem = memories.find((m) => m.original_file_name?.includes('internship_offer'));
+        return {
+          answer: "Your technical interview for the Software Engineering Intern role at Nova Labs is scheduled for 20 September 2026 at 2:00 PM via Google Meet with Alex Rivera. The round will cover Technical System Design and Live Coding.",
+          sources: mem ? [{
+            id: mem.id,
+            memoryId: mem.id,
+            title: mem.title,
+            fileName: mem.original_file_name || 'internship_offer.pdf',
+            type: 'document',
+            citation: 'internship_offer.pdf',
+            snippet: 'Role: Software Engineering Intern (AI & Systems)\nInternship interview: 20 September 2026, 2:00 PM\nRound: Technical System Design & Live Coding.',
+          }] : [],
+          foundInformation: true,
+          conflictDetected: false,
+        };
+      }
+
+      // 5. Tuition / fee query
+      if (qLower.includes('tuition') || qLower.includes('fee')) {
+        const mem = memories.find((m) => m.original_file_name?.includes('fee_receipt'));
+        return {
+          answer: "According to your semester fee receipt, you paid a total of ₹80,000 (₹78,000 tuition fee + ₹2,000 exam fee) on 15 August 2026 under reference HDFC-ONLINE-84729103.",
+          sources: mem ? [{
+            id: mem.id,
+            memoryId: mem.id,
+            title: mem.title,
+            fileName: mem.original_file_name || 'fee_receipt.png',
+            type: 'image',
+            citation: 'fee_receipt.png',
+            snippet: 'Tuition Fee Paid: ₹78,000\nExam Fee: ₹2,000\nTotal Amount Paid: ₹80,000\nPayment Mode: HDFC Net Banking',
+          }] : [],
+          foundInformation: true,
+          conflictDetected: false,
+        };
+      }
+
+      // 6. Conflict detection demo
+      if (qLower.includes('conflict') || (qLower.includes('date') && qLower.includes('presentation') && qLower.includes('change'))) {
+        const annMem = memories.find((m) => m.original_file_name?.includes('project_announcement'));
+        return {
+          answer: "Sources conflict regarding the project presentation date: project_update_old.txt states it was scheduled for 25 September 2026, whereas project_announcement.pdf confirms it is on 27 September 2026 at 11:30 AM.",
+          sources: [
+            {
+              id: 'src-conflict-1',
+              title: 'Project Update (Archive)',
+              fileName: 'project_update_old.txt',
+              type: 'document',
+              citation: 'project_update_old.txt',
+              snippet: 'Project presentation tentative date: 25 September 2026.',
+            },
+            {
+              id: annMem?.id || 'src-conflict-2',
+              memoryId: annMem?.id,
+              title: annMem?.title || 'Project Announcement (Official)',
+              fileName: annMem?.original_file_name || 'project_announcement.pdf',
+              type: 'document',
+              citation: 'project_announcement.pdf',
+              snippet: 'Final-year project presentation: 27 September 2026, 11:30 AM.',
+            },
+          ],
+          foundInformation: true,
+          conflictDetected: true,
+        };
+      }
     }
 
     // 7. General search across memories content & title
@@ -674,6 +707,17 @@ export const api = {
     const client = getSupabaseClient();
     if (isSupabaseConfigured() && client) {
       try {
+        // Retrieve storage path before deletion to remove physical file from private bucket
+        const { data: mem } = await client
+          .from('memories')
+          .select('storage_path')
+          .eq('id', memoryId)
+          .single();
+
+        if (mem?.storage_path && !mem.storage_path.startsWith('data:') && !mem.storage_path.startsWith('http') && !mem.storage_path.startsWith('blob:')) {
+          await client.storage.from('memory-files').remove([mem.storage_path]);
+        }
+
         await client.from('memories').delete().eq('id', memoryId);
       } catch (err) {
         console.warn('Supabase deleteMemory error:', err);
@@ -828,6 +872,17 @@ export const api = {
         const { data: userData } = await client.auth.getUser();
         const user = userData?.user;
         if (user) {
+          // Clean up physical storage files from Supabase bucket
+          try {
+            const { data: files } = await client.storage.from('memory-files').list(user.id);
+            if (files && files.length > 0) {
+              const paths = files.map((f) => `${user.id}/${f.name}`);
+              await client.storage.from('memory-files').remove(paths);
+            }
+          } catch (storageErr) {
+            console.warn('Supabase storage cleanup notice:', storageErr);
+          }
+
           await client.from('memories').delete().eq('user_id', user.id);
           await client.from('reminders').delete().eq('user_id', user.id);
         }
@@ -862,20 +917,40 @@ export const api = {
     // Sync to Supabase in background if connected
     const client = getSupabaseClient();
     if (isSupabaseConfigured() && client) {
-      client.auth.getUser().then(({ data }) => {
+      client.auth.getUser().then(async ({ data }) => {
         const user = data?.user;
         if (user) {
-          client
+          const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(conv.id);
+          const convId = isUuid ? conv.id : undefined;
+
+          const { data: savedConv } = await client
             .from('conversations')
             .upsert({
-              id: conv.id.includes('-') && conv.id.length === 36 ? conv.id : undefined,
+              ...(convId ? { id: convId } : {}),
               user_id: user.id,
               title: conv.title,
               updated_at: new Date().toISOString(),
             })
-            .then(() => {});
+            .select()
+            .single();
+
+          const targetConvId = savedConv?.id || (isUuid ? conv.id : undefined);
+          if (targetConvId && conv.messages && conv.messages.length > 0) {
+            const lastMsg = conv.messages[conv.messages.length - 1];
+            try {
+              await client.from('messages').insert({
+                conversation_id: targetConvId,
+                user_id: user.id,
+                role: lastMsg.role,
+                content: lastMsg.content,
+                sources: lastMsg.sources || null,
+              });
+            } catch (msgErr) {
+              console.warn('Supabase message sync notice:', msgErr);
+            }
+          }
         }
-      }).catch(() => {});
+      }).catch((e) => console.warn('Supabase saveConversation error:', e));
     }
   },
 

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import { geminiService, GeminiAnalysisResult } from '../services/gemini';
@@ -57,12 +57,34 @@ export const AddMemoryPage: React.FC = () => {
 
   const hasApiKey = geminiService.hasApiKey();
 
+  // Clean up Object URL on unmount or file change
+  useEffect(() => {
+    return () => {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
+
+  const ALLOWED_EXTENSIONS = ['.pdf', '.txt', '.md', '.png', '.jpg', '.jpeg', '.webp', '.doc', '.docx', '.csv', '.json', '.xlsx'];
+
   // File Selection
   const handleFileChange = async (file: File) => {
+    const ext = '.' + file.name.split('.').pop()?.toLowerCase();
+    if (!ALLOWED_EXTENSIONS.includes(ext)) {
+      setErrorMessage(`Unsupported file format (${ext}). Supported formats: PDF, Word (DOCX), Text, Markdown, CSV, JSON, and Images (PNG, JPG, WEBP).`);
+      return;
+    }
+
     if (file.size > 20 * 1024 * 1024) {
       setErrorMessage('File size exceeds 20 MB limit');
       return;
     }
+
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+    }
+
     setSelectedFile(file);
     setFileTitle(file.name.replace(/\.[^/.]+$/, ''));
     setErrorMessage(null);
