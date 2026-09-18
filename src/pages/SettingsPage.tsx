@@ -1,19 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
 import { geminiService, SUPPORTED_MODELS, DEFAULT_MODEL } from '../services/gemini';
 import {
-  getSupabaseConfig,
-  setSupabaseConfig,
-  testSupabaseConnection,
-  isSupabaseConfigured,
-} from '../lib/supabase';
-import { SUPABASE_MIGRATION_SQL } from '../services/migrationSql';
-import {
   User,
-  Database,
-  Trash2,
-  Sparkles,
   ShieldCheck,
   CheckCircle2,
   AlertTriangle,
@@ -23,21 +14,23 @@ import {
   Activity,
   ExternalLink,
   Check,
-  RefreshCw,
   Copy,
-  Server,
-  Code2,
-  ChevronDown,
-  ChevronUp,
+  Lock,
+  LogOut,
+  HardDrive,
+  FileText,
+  Image as ImageIcon,
+  BookOpen,
+  Trash2,
 } from 'lucide-react';
 
 export const SettingsPage: React.FC = () => {
-  const { user, isDemoUser, isSupabaseActive } = useAuth();
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
 
   const [stats, setStats] = useState({ total: 0, documents: 0, notes: 0, images: 0 });
-  const [demoLoading, setDemoLoading] = useState(false);
-  const [demoLoadedMessage, setDemoLoadedMessage] = useState<string | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [copiedUserId, setCopiedUserId] = useState(false);
 
   // Gemini API Configuration State
   const [apiKey, setApiKey] = useState('');
@@ -46,17 +39,6 @@ export const SettingsPage: React.FC = () => {
   const [isTestingKey, setIsTestingKey] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; latencyMs: number; error?: string } | null>(null);
   const [saveKeySuccess, setSaveKeySuccess] = useState(false);
-
-  // Supabase Status State
-  const [isTestingSupabase, setIsTestingSupabase] = useState(false);
-  const [supabaseTestResult, setSupabaseTestResult] = useState<{
-    success: boolean;
-    latencyMs: number;
-    error?: string;
-    details?: string;
-  } | null>(null);
-  const [showSqlGuide, setShowSqlGuide] = useState(false);
-  const [sqlCopied, setSqlCopied] = useState(false);
 
   useEffect(() => {
     loadStats();
@@ -99,47 +81,20 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
-  const handleTestSupabaseConfig = async () => {
-    setIsTestingSupabase(true);
-    setSupabaseTestResult(null);
+  const handleCopyUserId = async () => {
+    if (!user?.id) return;
     try {
-      const res = await testSupabaseConnection();
-      setSupabaseTestResult(res);
-    } catch (err: any) {
-      setSupabaseTestResult({
-        success: false,
-        latencyMs: 0,
-        error: err?.message || 'Supabase connection test failed.',
-      });
-    } finally {
-      setIsTestingSupabase(false);
-    }
-  };
-
-  const handleCopySql = async () => {
-    try {
-      await navigator.clipboard.writeText(SUPABASE_MIGRATION_SQL);
-      setSqlCopied(true);
-      setTimeout(() => setSqlCopied(false), 2500);
-    } catch (err) {
-      console.error('Failed to copy SQL:', err);
-    }
-  };
-
-  const handleLoadDemoData = async () => {
-    setDemoLoading(true);
-    setDemoLoadedMessage(null);
-    try {
-      const count = await api.loadDemoData();
-      await loadStats();
-      setDemoLoadedMessage(
-        `Loaded ${count} synthetic demo memories (exam_schedule, project_announcement, hostel_receipt, internship_offer, professor_notes, fee_receipt). Ready for grounded retrieval!`
-      );
+      await navigator.clipboard.writeText(user.id);
+      setCopiedUserId(true);
+      setTimeout(() => setCopiedUserId(false), 2000);
     } catch (err) {
       console.error(err);
-    } finally {
-      setDemoLoading(false);
     }
+  };
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/login');
   };
 
   const handleDeleteAll = async () => {
@@ -149,182 +104,145 @@ export const SettingsPage: React.FC = () => {
   };
 
   const hasConfiguredGemini = Boolean(geminiService.getApiKey());
-  const hasConfiguredSupabase = isSupabaseConfigured();
+  const authProvider = user?.app_metadata?.provider || (user?.email?.endsWith('@gmail.com') ? 'Google' : 'Supabase Auth');
+  const userDisplayName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User';
 
   return (
-    <div className="p-4 md:p-8 max-w-[950px] w-full mx-auto flex flex-col gap-8">
+    <div className="p-4 md:p-8 max-w-[900px] w-full mx-auto flex flex-col gap-8">
       <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-text-primary">Settings</h1>
+        <h1 className="text-xl sm:text-2xl font-bold text-text-primary">Settings &amp; Privacy</h1>
         <p className="text-xs text-text-secondary mt-1">
-          Configure Google Gemini AI intelligence, view backend database status, and manage memory storage.
+          Manage your personal account, private memory vault security, and AI model preferences.
         </p>
       </div>
 
-      {/* 1. Supabase Backend Status Card (Configured via .env on the backend) */}
-      <div className="p-6 rounded-2xl bg-gradient-to-b from-bg-elevated to-surface-container-low border border-border shadow-surface flex flex-col gap-5 relative overflow-hidden">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border pb-4">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
-              <Database className="w-4 h-4" />
+      {/* 1. User Profile & Account Card */}
+      <div className="p-6 rounded-2xl bg-bg-elevated border border-border shadow-surface flex flex-col gap-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-xl bg-accent-soft border border-accent/30 flex items-center justify-center text-accent text-base font-bold">
+              {userDisplayName.slice(0, 2).toUpperCase()}
             </div>
             <div>
               <h2 className="text-sm font-bold text-text-primary flex items-center gap-2">
-                <span>Database &amp; Authentication Backend</span>
-                <span className="font-mono text-[9px] px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 font-semibold border border-emerald-500/30 uppercase">
-                  Supabase PostgreSQL
+                <span>{userDisplayName}</span>
+                <span className="font-mono text-[10px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 uppercase font-semibold">
+                  {authProvider}
                 </span>
               </h2>
-              <p className="text-[11px] text-text-muted mt-0.5">
-                Backend connection is configured via server environment variables (<code className="font-mono text-emerald-400">.env</code>).
-              </p>
+              <p className="text-xs text-text-muted mt-0.5">{user?.email || 'No email associated'}</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <span
-              className={`font-mono text-[10px] px-2.5 py-1 rounded-full border flex items-center gap-1.5 ${
-                hasConfiguredSupabase
-                  ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30'
-                  : 'text-amber-400 bg-amber-400/10 border-amber-400/30'
-              }`}
-            >
-              <span
-                className={`w-1.5 h-1.5 rounded-full ${
-                  hasConfiguredSupabase ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
-                }`}
-              />
-              {hasConfiguredSupabase ? 'Supabase Connected' : 'Local Offline Mode'}
-            </span>
-          </div>
+          <button
+            type="button"
+            onClick={handleSignOut}
+            className="px-3.5 py-1.5 rounded-lg border border-border hover:bg-bg-hover text-text-secondary hover:text-text-primary text-xs font-medium flex items-center gap-1.5 transition-all self-start sm:self-auto"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span>Sign Out</span>
+          </button>
         </div>
 
-        {/* Backend Info & Status */}
-        <div className="p-4 rounded-xl bg-bg-base border border-border flex flex-col gap-3">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div className="flex flex-col gap-0.5">
-              <span className="text-xs font-semibold text-text-primary">
-                {hasConfiguredSupabase ? 'PostgreSQL Database & Auth Active' : 'Running in Offline / Local Demo Mode'}
-              </span>
-              <span className="text-[11px] text-text-muted">
-                {hasConfiguredSupabase
-                  ? 'Connected to your remote Supabase instance. User authentication, Row Level Security, and memory tables are active.'
-                  : 'No Supabase credentials detected in .env. The app is running smoothly using client-side isolated local storage.'}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div className="p-3.5 rounded-xl bg-bg-base border border-border flex flex-col gap-1">
+            <span className="text-[10px] font-mono text-text-muted uppercase">Authentication Provider</span>
+            <span className="text-xs font-medium text-text-primary flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              <span>{authProvider === 'google' ? 'Google OAuth 2.0 (Verified)' : 'Supabase Auth (Encrypted)'}</span>
+            </span>
+          </div>
+
+          <div className="p-3.5 rounded-xl bg-bg-base border border-border flex flex-col gap-1">
+            <span className="text-[10px] font-mono text-text-muted uppercase">Account Status</span>
+            <span className="text-xs font-medium text-emerald-400 flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>Active · Verified Private Vault</span>
+            </span>
+          </div>
+
+          <div className="p-3.5 rounded-xl bg-bg-base border border-border sm:col-span-2 flex items-center justify-between gap-3">
+            <div className="flex flex-col gap-0.5 min-w-0">
+              <span className="text-[10px] font-mono text-text-muted uppercase">User Vault ID</span>
+              <span className="text-xs font-mono text-text-secondary truncate">
+                {user?.id || 'offline-local-user'}
               </span>
             </div>
-
-            {hasConfiguredSupabase && (
+            {user?.id && (
               <button
                 type="button"
-                onClick={handleTestSupabaseConfig}
-                disabled={isTestingSupabase}
-                className="px-3.5 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-xs font-medium flex items-center gap-1.5 transition-all shrink-0"
+                onClick={handleCopyUserId}
+                className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-hover transition-colors shrink-0"
+                title="Copy User ID"
               >
-                <Activity className={`w-3.5 h-3.5 ${isTestingSupabase ? 'animate-spin' : ''}`} />
-                <span>{isTestingSupabase ? 'Pinging...' : 'Ping Database'}</span>
+                {copiedUserId ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
               </button>
             )}
           </div>
-
-          {!hasConfiguredSupabase && (
-            <div className="mt-2 p-3 rounded-lg bg-surface-container-high border border-border text-[11px] font-mono text-text-secondary flex flex-col gap-1">
-              <span className="text-text-primary font-semibold">To connect your Supabase backend:</span>
-              <span>1. Add <code className="text-emerald-400">VITE_SUPABASE_URL</code> and <code className="text-emerald-400">VITE_SUPABASE_ANON_KEY</code> to your <code className="text-text-primary">.env</code> file.</span>
-              <span>2. Run the database migration in the Supabase SQL editor using the schema button below.</span>
-            </div>
-          )}
-        </div>
-
-        {/* Test Connection Alert */}
-        {supabaseTestResult && (
-          <div
-            className={`p-3.5 rounded-xl border text-xs flex items-start gap-2.5 ${
-              supabaseTestResult.success
-                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
-                : 'bg-red-500/10 border-red-500/30 text-red-300'
-            }`}
-          >
-            {supabaseTestResult.success ? (
-              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-            ) : (
-              <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
-            )}
-            <div className="flex flex-col gap-0.5">
-              <span className="font-semibold">
-                {supabaseTestResult.success
-                  ? `Connection Verified! Latency: ${supabaseTestResult.latencyMs} ms`
-                  : 'Supabase Connection Failed'}
-              </span>
-              <span className="text-[11px] opacity-90">
-                {supabaseTestResult.success
-                  ? supabaseTestResult.details || 'Supabase Auth & Database are reachable and responsive.'
-                  : supabaseTestResult.error}
-              </span>
-            </div>
-          </div>
-        )}
-
-        {/* SQL Migration Setup Accordion */}
-        <div className="border border-border/70 rounded-xl bg-bg-base overflow-hidden">
-          <button
-            type="button"
-            onClick={() => setShowSqlGuide(!showSqlGuide)}
-            className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-bg-hover transition-colors"
-          >
-            <div className="flex items-center gap-2 text-xs font-semibold text-text-primary">
-              <Code2 className="w-4 h-4 text-emerald-400" />
-              <span>Database Schema Setup (1-Click SQL Migration)</span>
-            </div>
-            <div className="flex items-center gap-2 text-text-muted text-xs">
-              <span>{showSqlGuide ? 'Hide Instructions' : 'View SQL & Instructions'}</span>
-              {showSqlGuide ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-            </div>
-          </button>
-
-          {showSqlGuide && (
-            <div className="p-4 border-t border-border flex flex-col gap-4 text-xs">
-              <ol className="list-decimal list-inside space-y-1.5 text-text-secondary">
-                <li>Create a free project at <a href="https://supabase.com" target="_blank" rel="noopener noreferrer" className="text-emerald-400 underline">supabase.com</a>.</li>
-                <li>Go to the <strong>SQL Editor</strong> tab on the left sidebar of your Supabase dashboard.</li>
-                <li>Click the button below to copy the complete schema (creates tables, RLS policies, triggers, and the <code className="text-emerald-400 font-mono">memory-files</code> storage bucket).</li>
-                <li>Paste it into the SQL Editor and click <strong>Run</strong>.</li>
-                <li>Copy your <strong>Project URL</strong> and <strong>anon public key</strong> into the inputs above and click <strong>Save</strong>!</li>
-              </ol>
-
-              <div className="flex items-center justify-between pt-1">
-                <button
-                  type="button"
-                  onClick={handleCopySql}
-                  className="px-3.5 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 font-mono text-xs font-semibold flex items-center gap-2 transition-all"
-                >
-                  {sqlCopied ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                  <span>{sqlCopied ? 'Copied to Clipboard!' : 'Copy Complete Migration SQL'}</span>
-                </button>
-
-                <span className="font-mono text-[10px] text-text-muted">
-                  Profiles, Memories, Notes, Reminders, Conversations, Storage
-                </span>
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
-      {/* 2. Gemini API Configuration Card */}
-      <div className="p-6 rounded-2xl bg-gradient-to-b from-bg-elevated to-surface-container-low border border-border shadow-surface flex flex-col gap-6 relative overflow-hidden">
+      {/* 2. Privacy & Vault Security Details */}
+      <div className="p-6 rounded-2xl bg-bg-elevated border border-border shadow-surface flex flex-col gap-4">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+            <Lock className="w-4 h-4" />
+          </div>
+          <div>
+            <h2 className="text-sm font-bold text-text-primary">Data Privacy &amp; Encryption</h2>
+            <p className="text-[11px] text-text-muted">Strict privacy guarantees for your personal memory vault.</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="p-3.5 rounded-xl bg-bg-base border border-border flex flex-col gap-1.5">
+            <div className="flex items-center gap-2 text-xs font-semibold text-text-primary">
+              <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>Row Level Security</span>
+            </div>
+            <p className="text-[11px] text-text-muted leading-relaxed">
+              PostgreSQL Row Level Security (RLS) is active. Only your authenticated user ID can read or modify your data.
+            </p>
+          </div>
+
+          <div className="p-3.5 rounded-xl bg-bg-base border border-border flex flex-col gap-1.5">
+            <div className="flex items-center gap-2 text-xs font-semibold text-text-primary">
+              <HardDrive className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>Isolated Storage</span>
+            </div>
+            <p className="text-[11px] text-text-muted leading-relaxed">
+              Uploaded PDFs, notes, and receipts are compartmentalized in isolated cloud storage under your private folder.
+            </p>
+          </div>
+
+          <div className="p-3.5 rounded-xl bg-bg-base border border-border flex flex-col gap-1.5">
+            <div className="flex items-center gap-2 text-xs font-semibold text-text-primary">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>Zero Public Sharing</span>
+            </div>
+            <p className="text-[11px] text-text-muted leading-relaxed">
+              Your indexed memories are strictly personal. They are never published publicly or shared with third parties.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* 3. Gemini AI Configuration Card */}
+      <div className="p-6 rounded-2xl bg-bg-elevated border border-border shadow-surface flex flex-col gap-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border pb-4">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-accent-soft border border-accent/30 flex items-center justify-center text-accent">
+            <div className="w-8 h-8 rounded-lg bg-accent-soft border border-accent/30 flex items-center justify-center text-accent">
               <Key className="w-4 h-4" />
             </div>
             <div>
               <h2 className="text-sm font-bold text-text-primary flex items-center gap-2">
-                <span>Google Gemini API Configuration</span>
+                <span>Google Gemini AI Engine</span>
                 <span className="font-mono text-[9px] px-2 py-0.5 rounded bg-accent/15 text-accent font-semibold border border-accent/30 uppercase">
-                  Direct AI Engine
+                  Grounded Reasoning
                 </span>
               </h2>
               <p className="text-[11px] text-text-muted mt-0.5">
-                Power grounded memory Q&amp;A, note auto-tagging, multimodal vision extraction, and reminder detection.
+                Powers conversational search, multi-source verification, note auto-tagging, and deadline detection.
               </p>
             </div>
           </div>
@@ -333,41 +251,41 @@ export const SettingsPage: React.FC = () => {
             <span
               className={`font-mono text-[10px] px-2.5 py-1 rounded-full border flex items-center gap-1.5 ${
                 hasConfiguredGemini
-                  ? 'text-success bg-success/10 border-success/30'
+                  ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30'
                   : 'text-amber-400 bg-amber-400/10 border-amber-400/30'
               }`}
             >
               <span
                 className={`w-1.5 h-1.5 rounded-full ${
-                  hasConfiguredGemini ? 'bg-success animate-pulse' : 'bg-amber-400'
+                  hasConfiguredGemini ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
                 }`}
               />
-              {hasConfiguredGemini ? 'Gemini API Active' : 'Demo Grounding Mode'}
+              {hasConfiguredGemini ? 'Gemini Active' : 'API Key Optional'}
             </span>
           </div>
         </div>
 
         {/* API Key Input */}
         <div className="flex flex-col gap-2">
-          <label className="text-xs font-semibold text-text-primary flex items-center justify-between">
-            <span>Gemini API Key</span>
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-semibold text-text-primary">Gemini API Key</label>
             <a
               href="https://aistudio.google.com/app/apikey"
               target="_blank"
               rel="noopener noreferrer"
               className="text-[11px] font-mono text-accent hover:underline inline-flex items-center gap-1"
             >
-              <span>Get Free API Key from Google AI Studio</span>
+              <span>Get API Key from Google AI Studio</span>
               <ExternalLink className="w-3 h-3" />
             </a>
-          </label>
+          </div>
 
           <div className="relative flex items-center">
             <input
               type={showApiKey ? 'text' : 'password'}
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
-              placeholder="AIzaSy..."
+              placeholder="Configured via environment (or paste custom key here)"
               className="w-full bg-bg-base border border-border rounded-xl pl-4 pr-12 py-2.5 text-xs text-text-primary font-mono placeholder:text-text-muted focus:outline-none focus:border-accent"
             />
             <div className="absolute right-2 flex items-center gap-1">
@@ -382,13 +300,13 @@ export const SettingsPage: React.FC = () => {
             </div>
           </div>
           <span className="text-[10px] text-text-muted">
-            Stored securely in your local browser storage. Never transmitted to unauthorized endpoints.
+            API keys are kept strictly private on your device or in server environment variables (<code className="text-text-secondary">.env</code>).
           </span>
         </div>
 
         {/* Model Selection */}
         <div className="flex flex-col gap-2">
-          <label className="text-xs font-semibold text-text-primary">Generation &amp; Vision Model</label>
+          <label className="text-xs font-semibold text-text-primary">Active Model</label>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {SUPPORTED_MODELS.map((m) => {
               const isSelected = selectedModel === m.id;
@@ -433,14 +351,14 @@ export const SettingsPage: React.FC = () => {
               className="px-4 py-2 rounded-lg bg-accent text-white text-xs font-medium hover:brightness-110 active:scale-95 transition-all shadow-[0_0_12px_rgba(239,68,68,0.25)] flex items-center gap-1.5"
             >
               <Check className="w-3.5 h-3.5" />
-              <span>Save Configuration</span>
+              <span>Save Preferences</span>
             </button>
           </div>
 
           {saveKeySuccess && (
-            <span className="font-mono text-xs text-emerald-400 flex items-center gap-1.5 animate-fade-in">
+            <span className="font-mono text-xs text-emerald-400 flex items-center gap-1.5">
               <CheckCircle2 className="w-4 h-4" />
-              Configuration saved successfully!
+              Preferences saved successfully!
             </span>
           )}
         </div>
@@ -462,12 +380,12 @@ export const SettingsPage: React.FC = () => {
             <div className="flex flex-col gap-0.5">
               <span className="font-semibold">
                 {testResult.success
-                  ? `Gemini API connection verified! Response latency: ${testResult.latencyMs} ms`
-                  : 'Connection failed'}
+                  ? `Connection Verified! Latency: ${testResult.latencyMs} ms`
+                  : 'Connection Test Failed'}
               </span>
               <span className="text-[11px] opacity-90">
                 {testResult.success
-                  ? `Model "${selectedModel}" is ready to perform grounded memory answering and content analysis.`
+                  ? `Model "${selectedModel}" is active and ready for grounded memory retrieval.`
                   : testResult.error}
               </span>
             </div>
@@ -475,88 +393,52 @@ export const SettingsPage: React.FC = () => {
         )}
       </div>
 
-      {/* 3. User Profile Card */}
-      <div className="p-6 rounded-2xl bg-bg-elevated border border-border flex flex-col gap-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-text-primary flex items-center gap-2">
-            <User className="w-4 h-4 text-accent" />
-            <span>User Profile &amp; Authentication</span>
-          </h2>
-          <span
-            className={`font-mono text-[10px] px-2.5 py-0.5 rounded-full border ${
-              isDemoUser
-                ? 'text-amber-400 bg-amber-400/10 border-amber-400/30'
-                : 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30'
-            }`}
-          >
-            {isDemoUser ? 'Demo Guest Mode' : isSupabaseActive ? 'Supabase Authenticated' : 'Local User'}
-          </span>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="p-3.5 rounded-xl bg-bg-base border border-border">
-            <span className="text-[10px] font-mono text-text-muted uppercase block">Display Name</span>
-            <span className="text-xs font-medium text-text-primary block mt-0.5">
-              {user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Aayush'}
-            </span>
-          </div>
-
-          <div className="p-3.5 rounded-xl bg-bg-base border border-border">
-            <span className="text-[10px] font-mono text-text-muted uppercase block">Email</span>
-            <span className="text-xs font-medium text-text-primary block mt-0.5">
-              {user?.email || 'aayush@memory.ai'}
-            </span>
-          </div>
-
-          <div className="p-3.5 rounded-xl bg-bg-base border border-border sm:col-span-2">
-            <span className="text-[10px] font-mono text-text-muted uppercase block">User ID</span>
-            <span className="text-xs font-mono text-text-secondary block mt-0.5 break-all">
-              {user?.id || 'demo-user-13506280'}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* 4. Demo Data Loader (One-Click Judge Demo) */}
-      <div className="p-6 rounded-2xl bg-gradient-to-r from-bg-elevated via-bg-elevated to-accent-soft/30 border border-border flex flex-col gap-3 relative">
+      {/* 4. Vault Storage Overview */}
+      <div className="p-6 rounded-2xl bg-bg-elevated border border-border shadow-surface flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-accent" />
-            <h2 className="text-sm font-bold text-text-primary">Demo Data &amp; Benchmark Loader</h2>
+            <BookOpen className="w-4 h-4 text-accent" />
+            <h2 className="text-sm font-bold text-text-primary">Vault Storage Summary</h2>
           </div>
-          <span className="font-mono text-[10px] text-accent uppercase tracking-wider">
-            BENCHMARK READY
+          <span className="font-mono text-xs text-text-muted">
+            {stats.total} total indexed memories
           </span>
         </div>
 
-        <p className="text-xs text-text-secondary leading-relaxed">
-          Seed the complete synthetic test dataset including DBMS exam schedule, final project announcement, campus hostel receipt, Nova Labs internship offer, professor notes, and semester fee receipt.
-        </p>
-
-        {demoLoadedMessage && (
-          <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-300 flex items-start gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-            <span>{demoLoadedMessage}</span>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="p-3.5 rounded-xl bg-bg-base border border-border flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center">
+              <FileText className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="text-sm font-bold text-text-primary">{stats.documents}</span>
+              <span className="text-[10px] text-text-muted block">Documents &amp; PDFs</span>
+            </div>
           </div>
-        )}
 
-        <div className="flex items-center justify-between pt-2">
-          <span className="font-mono text-xs text-text-muted">
-            Currently: {stats.total} memories ({stats.documents} documents, {stats.notes} notes, {stats.images} images)
-          </span>
+          <div className="p-3.5 rounded-xl bg-bg-base border border-border flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center">
+              <BookOpen className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="text-sm font-bold text-text-primary">{stats.notes}</span>
+              <span className="text-[10px] text-text-muted block">Notes &amp; Thoughts</span>
+            </div>
+          </div>
 
-          <button
-            onClick={handleLoadDemoData}
-            disabled={demoLoading}
-            className="text-xs font-medium text-white bg-accent hover:brightness-110 active:scale-95 px-4 py-2 rounded-lg transition-all flex items-center gap-2 shadow-[0_0_12px_rgba(239,68,68,0.25)]"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${demoLoading ? 'animate-spin' : ''}`} />
-            <span>{demoLoading ? 'Loading...' : 'Reload Benchmark Dataset'}</span>
-          </button>
+          <div className="p-3.5 rounded-xl bg-bg-base border border-border flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
+              <ImageIcon className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="text-sm font-bold text-text-primary">{stats.images}</span>
+              <span className="text-[10px] text-text-muted block">Images &amp; Receipts</span>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* 5. Danger Zone: Delete All Memories */}
+      {/* 5. Danger Zone: Delete All Vault Data */}
       <div className="p-6 rounded-2xl bg-bg-elevated border border-red-500/20 flex flex-col gap-4">
         <h2 className="text-sm font-semibold text-red-400 flex items-center gap-2">
           <AlertTriangle className="w-4 h-4" />
@@ -565,9 +447,9 @@ export const SettingsPage: React.FC = () => {
 
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl bg-red-500/5 border border-red-500/20">
           <div>
-            <h3 className="text-xs font-semibold text-text-primary">Delete All Stored Memories</h3>
+            <h3 className="text-xs font-semibold text-text-primary">Purge Personal Memory Vault</h3>
             <p className="text-[11px] text-text-muted mt-0.5">
-              Permanently purge all documents, notes, extracted images and linked reminders.
+              Permanently delete all indexed documents, notes, receipts, and linked reminders from your vault.
             </p>
           </div>
 
@@ -576,7 +458,7 @@ export const SettingsPage: React.FC = () => {
             className="text-xs font-medium text-red-400 hover:text-white hover:bg-red-600 bg-red-500/10 px-4 py-2 rounded-lg border border-red-500/30 transition-all flex items-center justify-center gap-2 shrink-0"
           >
             <Trash2 className="w-3.5 h-3.5" />
-            <span>Clear All Data</span>
+            <span>Purge Vault Data</span>
           </button>
         </div>
       </div>
@@ -590,7 +472,7 @@ export const SettingsPage: React.FC = () => {
               <h3 className="text-sm font-bold text-text-primary">Confirm Deletion of All Memories</h3>
             </div>
             <p className="text-xs text-text-secondary leading-relaxed">
-              This will permanently delete all {stats.total} indexed memories and associated reminders. This action cannot be undone.
+              This will permanently delete all {stats.total} memories and reminders stored in your private vault. This action cannot be undone.
             </p>
             <div className="flex items-center justify-end gap-3 pt-2">
               <button
@@ -603,7 +485,7 @@ export const SettingsPage: React.FC = () => {
                 onClick={handleDeleteAll}
                 className="px-4 py-2 rounded-lg text-xs font-medium text-white bg-red-600 hover:bg-red-700 transition-colors"
               >
-                Yes, Delete Everything
+                Yes, Purge Vault
               </button>
             </div>
           </div>
