@@ -346,8 +346,11 @@ export const SettingsPage: React.FC = () => {
 
         {/* Model Selection */}
         <div className="flex flex-col gap-2">
-          <label className="text-xs font-semibold text-text-primary">Active Model</label>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-semibold text-text-primary">Active Model</label>
+            <span className="text-[10px] font-mono text-accent font-medium">Selected: {selectedModel}</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {SUPPORTED_MODELS.map((m) => {
               const isSelected = selectedModel === m.id;
               return (
@@ -355,7 +358,7 @@ export const SettingsPage: React.FC = () => {
                   key={m.id}
                   type="button"
                   onClick={() => setSelectedModel(m.id)}
-                  className={`text-left p-3 rounded-xl border transition-all flex flex-col gap-1 ${
+                  className={`text-left p-3 rounded-xl border transition-all flex flex-col gap-1.5 ${
                     isSelected
                       ? 'bg-accent/15 border-accent text-white shadow-sm'
                       : 'bg-bg-base border-border text-text-secondary hover:border-border-strong hover:text-text-primary'
@@ -365,10 +368,21 @@ export const SettingsPage: React.FC = () => {
                     <span className="font-semibold text-xs text-text-primary">{m.name}</span>
                     {isSelected && <Check className="w-3.5 h-3.5 text-accent" />}
                   </div>
-                  <span className="text-[10px] text-text-muted">{m.desc}</span>
+                  <span className="text-[10px] text-text-muted leading-snug">{m.desc}</span>
                 </button>
               );
             })}
+          </div>
+
+          <div className="mt-2 flex flex-col sm:flex-row sm:items-center gap-2 p-2.5 rounded-xl bg-bg-base/70 border border-border">
+            <label className="text-[11px] text-text-muted whitespace-nowrap">Or custom model identifier:</label>
+            <input
+              type="text"
+              value={selectedModel}
+              onChange={(e) => setSelectedModel(e.target.value.trim())}
+              placeholder="e.g. gemini-2.5-flash or gemini-2.5-pro"
+              className="flex-1 bg-bg-elevated border border-border rounded-lg px-3 py-1.5 text-xs text-text-primary font-mono focus:outline-none focus:border-accent"
+            />
           </div>
         </div>
 

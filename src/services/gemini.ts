@@ -5,10 +5,9 @@ const STORAGE_MODEL_KEY = 'memory_ai_gemini_model';
 export const DEFAULT_MODEL = 'gemini-2.5-flash';
 
 export const SUPPORTED_MODELS = [
-  { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', desc: 'Recommended · Fastest & most capable multimodal model' },
-  { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', desc: 'Next-gen multimodal reasoning & speed' },
-  { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash', desc: 'Fast, versatile model with large context' },
-  { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro', desc: 'Complex reasoning & deep analysis' },
+  { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', desc: 'Recommended · Flagship multimodal model with ultra-fast search' },
+  { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', desc: 'Frontier Reasoning · State-of-the-art complex analysis & deep synthesis' },
+  { id: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash-Lite', desc: 'Ultra-low latency · High throughput lightweight intelligence' },
 ];
 
 export interface GeminiAnalysisResult {
@@ -53,7 +52,11 @@ export const geminiService = {
   },
 
   getModel(): string {
-    return localStorage.getItem(STORAGE_MODEL_KEY) || DEFAULT_MODEL;
+    const stored = localStorage.getItem(STORAGE_MODEL_KEY);
+    // Auto-migrate retired models (1.5-pro -> 2.5-pro, 2.0-flash / 1.5-flash -> 2.5-flash)
+    if (stored === 'gemini-1.5-pro') return 'gemini-2.5-pro';
+    if (stored === 'gemini-2.0-flash' || stored === 'gemini-1.5-flash') return 'gemini-2.5-flash';
+    return stored || DEFAULT_MODEL;
   },
 
   setModel(model: string): void {
@@ -129,6 +132,16 @@ export const geminiService = {
     if (!res.ok) {
       const errData = await res.json().catch(() => ({}));
       const msg = errData?.error?.message || `Gemini API error (${res.status} ${res.statusText})`;
+
+      // Auto-fallback recovery: If the requested model is not found/deprecated, retry with DEFAULT_MODEL
+      if (res.status === 404 && model !== DEFAULT_MODEL) {
+        console.warn(`Model "${model}" was not found (retired/unsupported). Automatically recovering with "${DEFAULT_MODEL}".`);
+        return this.callGenerateContent(prompt, systemInstruction, {
+          ...options,
+          model: DEFAULT_MODEL,
+        });
+      }
+
       throw new Error(msg);
     }
 
@@ -184,8 +197,30 @@ export const geminiService = {
       };
     }
 
-    // Format memories for grounding
-    const formattedMemories = memories.map((m, idx) => {
+    // Rank & prioritize memories by keyword relevance to question
+    const qTerms = question
+      .toLowerCase()
+      .split(/\s+/)
+      .filter((w) => w.length > 2 && !['what', 'when', 'where', 'which', 'does', 'have', 'from', 'with', 'about', 'this', 'that', 'tell'].includes(w));
+
+    const scoredMemories = [...memories].sort((a, b) => {
+      let scoreA = 0;
+      let scoreB = 0;
+      const textA = `${a.title} ${a.description || ''} ${a.original_file_name || ''} ${a.content || ''} ${a.tags?.join(' ') || ''}`.toLowerCase();
+      const textB = `${b.title} ${b.description || ''} ${b.original_file_name || ''} ${b.content || ''} ${b.tags?.join(' ') || ''}`.toLowerCase();
+
+      for (const t of qTerms) {
+        if (textA.includes(t)) scoreA += 1;
+        if (a.title.toLowerCase().includes(t)) scoreA += 3;
+        if (textB.includes(t)) scoreB += 1;
+        if (b.title.toLowerCase().includes(t)) scoreB += 3;
+      }
+      return scoreB - scoreA;
+    });
+
+    // Format top memories for grounding (cap at 30 most relevant)
+    const candidates = scoredMemories.slice(0, 30);
+    const formattedMemories = candidates.map((m, idx) => {
       return `--- MEMORY ITEM [${idx + 1}] ---
 ID: ${m.id}
 Title: ${m.title}
@@ -193,8 +228,6 @@ Filename: ${m.original_file_name || m.title}
 Type: ${m.type}
 Category: ${m.category || 'General'}
 Tags: ${m.tags?.join(', ') || 'none'}
-Created: ${m.created_at}
-Description: ${m.description || ''}
 Content:
 ${m.content || m.description || '(No explicit content)'}
 ---------------------------`;
@@ -203,18 +236,18 @@ ${m.content || m.description || '(No explicit content)'}
     const systemInstruction = `You are Memory AI, a private personal information retrieval assistant.
 Answer user questions using ONLY information retrieved from the user's stored memories provided below.
 
-Strict Grounding Rules:
+Strict Grounding & Citation Rules:
 1. Ground every statement strictly in the provided memories. Do NOT invent, assume, or hallucinate facts outside the memories.
 2. If the answer cannot be found in the memories, your answer MUST be exactly:
    "I couldn't find this information in your memories."
    Set foundInformation to false and sources to [].
-3. For any found information, you MUST cite the specific memory sources in the "sources" list, including:
-   - memoryId: the exact ID of the memory item
-   - title: the memory title
-   - fileName: original filename
-   - citation: filename or title
+3. For any found information, you MUST cite the specific memory source in the "sources" list:
+   - memoryId: You MUST use the exact "ID" string of the specific memory item you retrieved the fact from (e.g. "ID: xyz"). NEVER cite a memory that does not contain the answer.
+   - title: Exact title of that specific memory item
+   - fileName: Exact Filename of that specific memory item
+   - citation: Filename or Title
    - type: document | image | note
-   - snippet: exact quotation or excerpt from that memory that proves your answer
+   - snippet: Exact sentence or excerpt from that memory that proves your answer
 4. If sources conflict (e.g. differing dates, differing amounts, differing status across documents), do NOT silently choose one.
    Set conflictDetected to true, clearly state in your answer that sources conflict, and cite both conflicting sources.
 5. If the question is a general conversation or unrelated question, reply that Memory AI is focused on searching and retrieving their personal memories.
@@ -259,23 +292,29 @@ Provide the JSON response now:`;
 
       const parsed = JSON.parse(cleaned);
 
-      // Verify sources and map back to memory if memoryId is missing
-      const verifiedSources: Source[] = (parsed.sources || []).map((s: any) => {
-        const matchingMem = memories.find((m) => 
-          m.id === s.memoryId || 
-          m.original_file_name === s.fileName || 
-          m.title.toLowerCase() === s.title?.toLowerCase()
-        );
-        return {
-          id: s.memoryId || matchingMem?.id || 'src-' + Math.random().toString(36).substring(2, 7),
-          memoryId: matchingMem?.id || s.memoryId,
-          title: s.title || matchingMem?.title || 'Referenced Memory',
-          fileName: s.fileName || matchingMem?.original_file_name || matchingMem?.title || 'memory',
-          citation: s.citation || s.fileName || matchingMem?.original_file_name || matchingMem?.title,
-          type: s.type || matchingMem?.type || 'document',
-          snippet: s.snippet || matchingMem?.content?.slice(0, 200) || '',
-        };
-      });
+      // Verify sources strictly against actual memories
+      const verifiedSources: Source[] = (parsed.sources || [])
+        .map((s: any) => {
+          let matchingMem = memories.find((m) => m.id === s.memoryId);
+          if (!matchingMem && s.fileName) {
+            matchingMem = memories.find((m) => m.original_file_name?.toLowerCase() === s.fileName.toLowerCase());
+          }
+          if (!matchingMem && s.title) {
+            matchingMem = memories.find((m) => m.title.toLowerCase() === s.title.toLowerCase());
+          }
+          if (!matchingMem) return null;
+
+          return {
+            id: matchingMem.id,
+            memoryId: matchingMem.id,
+            title: matchingMem.title,
+            fileName: matchingMem.original_file_name || matchingMem.title,
+            citation: matchingMem.original_file_name || matchingMem.title,
+            type: matchingMem.type,
+            snippet: s.snippet || matchingMem.content?.slice(0, 250) || matchingMem.description || '',
+          };
+        })
+        .filter(Boolean) as Source[];
 
       return {
         answer: parsed.answer || "I couldn't find this information in your memories.",
