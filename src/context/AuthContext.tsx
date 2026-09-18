@@ -14,6 +14,7 @@ interface AuthContextType {
     password?: string,
     displayName?: string
   ) => Promise<{ error?: string; requiresEmailVerification?: boolean }>;
+  signInWithGoogle: () => Promise<{ error?: string }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error?: string; success?: boolean }>;
   enableDemoUser: () => void;
@@ -215,6 +216,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { error: 'Supabase is not configured yet. Add your Project URL & Anon Key in Settings.' };
   };
 
+  const signInWithGoogle = async (): Promise<{ error?: string }> => {
+    const client = getSupabaseClient();
+    if (isSupabaseConfigured() && client) {
+      try {
+        const { error } = await client.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            redirectTo: `${window.location.origin}/dashboard`,
+          },
+        });
+        if (error) return { error: error.message };
+        return {};
+      } catch (err: any) {
+        return { error: err?.message || 'Failed to initialize Google sign in.' };
+      }
+    }
+    return { error: 'Supabase backend is not configured in .env.' };
+  };
+
   const enableDemoUser = () => {
     setUser(DEMO_USER_OBJ);
     setIsDemoUser(true);
@@ -235,6 +255,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isSupabaseActive: supabaseActive,
         signIn,
         signUp,
+        signInWithGoogle,
         signOut,
         resetPassword,
         enableDemoUser,
