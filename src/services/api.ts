@@ -616,6 +616,40 @@ export const api = {
     return { count, failed, errors };
   },
 
+  /**
+   * Delete empty screenshot memories that have neither extracted text nor image binary data in storage.
+   */
+  async cleanGhostMemories(): Promise<number> {
+    const list = await this.listMemories();
+    const ghostMems = list.filter(
+      (m) =>
+        (m.type === 'image' ||
+          /\.(png|jpe?g|webp|gif|bmp|tiff|heic)$/i.test(m.original_file_name || '') ||
+          m.title.toLowerCase().includes('screenshot')) &&
+        (!m.content ||
+          m.content.length < 60 ||
+          m.content.startsWith('Image uploaded:') ||
+          m.content.startsWith('Uploaded file:') ||
+          m.content.startsWith('Uploaded '))
+    );
+
+    let count = 0;
+    for (const g of ghostMems) {
+      let hasData = false;
+      if (g.storage_path && (g.storage_path.startsWith('data:') || g.storage_path.startsWith('http'))) {
+        hasData = true;
+      } else {
+        const inDb = (await getImageFromIndexedDB(g.id)) || (await getImageFromIndexedDB(g.storage_path || ''));
+        if (inDb) hasData = true;
+      }
+      if (!hasData) {
+        await this.deleteMemory(g.id);
+        count++;
+      }
+    }
+    return count;
+  },
+
   async askMemory(question: string, _conversationId?: string): Promise<AskResponse> {
     // 1. Fetch available memories (either from Supabase or Local)
     let memories: Memory[] = [];

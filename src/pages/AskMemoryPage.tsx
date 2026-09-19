@@ -4,6 +4,7 @@ import { api } from '../services/api';
 import { geminiService } from '../services/gemini';
 import { Source, ChatMessage, ChatConversation } from '../types';
 import { SourceCard } from '../components/common/SourceCard';
+import { getImageFromIndexedDB } from '../utils/indexedDb';
 import {
   Send,
   Sparkles,
@@ -57,12 +58,16 @@ export const AskMemoryPage: React.FC = () => {
   const [showKeyModal, setShowKeyModal] = useState(false);
   const [modalKeyInput, setModalKeyInput] = useState('');
   const [unindexedImagesCount, setUnindexedImagesCount] = useState(0);
+  const [ghostImagesCount, setGhostImagesCount] = useState(0);
+  const [isCleaningGhosts, setIsCleaningGhosts] = useState(false);
+  const [dismissUnindexedBanner, setDismissUnindexedBanner] = useState(false);
   const [isTranscribingBatch, setIsTranscribingBatch] = useState(false);
   const [transcribeNotice, setTranscribeNotice] = useState<{
     type: 'success' | 'warning' | 'info';
     message: string;
     actionText?: string;
     actionLink?: string;
+    onAction?: () => void;
   } | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -78,7 +83,7 @@ export const AskMemoryPage: React.FC = () => {
   const checkUnindexedImages = async () => {
     try {
       const list = await api.listMemories();
-      const count = list.filter(
+      const unindexed = list.filter(
         (m) =>
           (m.type === 'image' ||
             /\.(png|jpe?g|webp|gif|bmp|tiff|heic)$/i.test(m.original_file_name || '') ||
@@ -88,10 +93,49 @@ export const AskMemoryPage: React.FC = () => {
             m.content.startsWith('Image uploaded:') ||
             m.content.startsWith('Uploaded file:') ||
             m.content.startsWith('Uploaded '))
-      ).length;
-      setUnindexedImagesCount(count);
+      );
+
+      let indexable = 0;
+      let ghosts = 0;
+      for (const m of unindexed) {
+        let hasImage = false;
+        if (m.storage_path && (m.storage_path.startsWith('data:') || m.storage_path.startsWith('http'))) {
+          hasImage = true;
+        } else {
+          const inDb = (await getImageFromIndexedDB(m.id)) || (await getImageFromIndexedDB(m.storage_path || ''));
+          if (inDb) hasImage = true;
+        }
+        if (hasImage) indexable++;
+        else ghosts++;
+      }
+
+      setUnindexedImagesCount(indexable);
+      setGhostImagesCount(ghosts);
     } catch {
       // ignore
+    }
+  };
+
+  const handleCleanGhosts = async () => {
+    setIsCleaningGhosts(true);
+    try {
+      const removed = await api.cleanGhostMemories();
+      setGhostImagesCount(0);
+      setTranscribeNotice({
+        type: 'success',
+        message: `Removed ${removed} incomplete screenshot record${removed === 1 ? '' : 's'}. You can now upload fresh screenshots in Add Memory.`,
+        actionText: 'Add Screenshots',
+        actionLink: '/add',
+      });
+      await checkUnindexedImages();
+      setTimeout(() => setTranscribeNotice(null), 8000);
+    } catch (err: any) {
+      setTranscribeNotice({
+        type: 'warning',
+        message: 'Cleanup notice: ' + (err?.message || 'Error cleaning records'),
+      });
+    } finally {
+      setIsCleaningGhosts(false);
     }
   };
 
@@ -118,9 +162,9 @@ export const AskMemoryPage: React.FC = () => {
       } else if (result.count === 0 && result.failed > 0) {
         setTranscribeNotice({
           type: 'warning',
-          message: `Could not index ${result.failed} screenshot${result.failed === 1 ? '' : 's'}: Original image files were not stored in browser cache. Please re-upload them in "Add Memory" where AI Vision now extracts all text & data immediately.`,
-          actionText: 'Go to Add Memory',
-          actionLink: '/add',
+          message: `Could not index ${result.failed} screenshot${result.failed === 1 ? '' : 's'}: Original image files were not stored in browser cache. Click "Clean Up Ghosts" to remove these empty records.`,
+          actionText: 'Clean Up Ghosts',
+          onAction: handleCleanGhosts,
         });
       } else {
         setTranscribeNotice({
@@ -537,8 +581,46 @@ export const AskMemoryPage: React.FC = () => {
           </div>
         )}
 
+        {/* Ghost Images Detected Banner */}
+        {ghostImagesCount > 0 && (
+          <div className="mx-4 md:mx-6 mt-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2.5">
+              <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+              <div>
+                <span className="font-semibold text-text-primary">
+                  {ghostImagesCount} incomplete screenshot record{ghostImagesCount > 1 ? 's' : ''} detected
+                </span>
+                <p className="text-[11px] text-text-muted mt-0.5">
+                  These records have missing image files from earlier uploads and cannot be read by OCR.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={handleCleanGhosts}
+                disabled={isCleaningGhosts}
+                className="px-3 py-1.5 rounded-lg bg-red-500/15 hover:bg-red-500/25 text-red-300 border border-red-500/30 text-xs font-medium flex items-center gap-1.5 transition-colors disabled:opacity-50"
+              >
+                {isCleaningGhosts ? (
+                  <Clock className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Trash2 className="w-3.5 h-3.5" />
+                )}
+                <span>Remove Incomplete ({ghostImagesCount})</span>
+              </button>
+              <button
+                onClick={() => setGhostImagesCount(0)}
+                className="text-text-muted hover:text-text-primary p-1"
+                title="Dismiss"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Unindexed Screenshots Banner */}
-        {unindexedImagesCount > 0 && (
+        {unindexedImagesCount > 0 && !dismissUnindexedBanner && (
           <div className="mx-4 md:mx-6 mt-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
             <div className="flex items-center gap-2.5">
               <Zap className="w-4 h-4 text-amber-400 shrink-0 animate-pulse" />
@@ -551,23 +633,32 @@ export const AskMemoryPage: React.FC = () => {
                 </p>
               </div>
             </div>
-            <button
-              onClick={handleIndexAllImages}
-              disabled={isTranscribingBatch}
-              className="px-3.5 py-1.5 rounded-lg bg-accent text-white font-medium text-xs hover:brightness-110 flex items-center gap-1.5 shrink-0 shadow-sm disabled:opacity-50"
-            >
-              {isTranscribingBatch ? (
-                <>
-                  <Clock className="w-3.5 h-3.5 animate-spin" />
-                  <span>Indexing Screenshots...</span>
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>Index All Screenshots</span>
-                </>
-              )}
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={handleIndexAllImages}
+                disabled={isTranscribingBatch}
+                className="px-3.5 py-1.5 rounded-lg bg-accent text-white font-medium text-xs hover:brightness-110 flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+              >
+                {isTranscribingBatch ? (
+                  <>
+                    <Clock className="w-3.5 h-3.5 animate-spin" />
+                    <span>Indexing Screenshots...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Index All Screenshots</span>
+                  </>
+                )}
+              </button>
+              <button
+                onClick={() => setDismissUnindexedBanner(true)}
+                className="text-text-muted hover:text-text-primary p-1"
+                title="Dismiss"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
         )}
 
@@ -589,7 +680,15 @@ export const AskMemoryPage: React.FC = () => {
                 <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
               )}
               <span className="leading-relaxed">{transcribeNotice.message}</span>
-              {transcribeNotice.actionLink && (
+              {transcribeNotice.onAction && (
+                <button
+                  onClick={transcribeNotice.onAction}
+                  className="px-2.5 py-1 rounded bg-accent text-white font-medium text-[11px] hover:brightness-110 shrink-0 whitespace-nowrap shadow-sm ml-auto sm:ml-2"
+                >
+                  {transcribeNotice.actionText || 'Action'}
+                </button>
+              )}
+              {transcribeNotice.actionLink && !transcribeNotice.onAction && (
                 <Link
                   to={transcribeNotice.actionLink}
                   className="px-2.5 py-1 rounded bg-accent text-white font-medium text-[11px] hover:brightness-110 shrink-0 whitespace-nowrap shadow-sm ml-auto sm:ml-2"
