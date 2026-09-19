@@ -32,16 +32,24 @@ export const MemoryLibraryPage: React.FC = () => {
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'title'>('newest');
 
   const [isTranscribingBatch, setIsTranscribingBatch] = useState(false);
-  const [transcribeNotice, setTranscribeNotice] = useState<string | null>(null);
+  const [transcribeNotice, setTranscribeNotice] = useState<{
+    type: 'success' | 'warning' | 'info';
+    message: string;
+    actionText?: string;
+    actionLink?: string;
+  } | null>(null);
 
   const unindexedImagesCount = useMemo(() => {
     return memories.filter(
       (m) =>
-        m.type === 'image' &&
+        (m.type === 'image' ||
+          /\.(png|jpe?g|webp|gif|bmp|tiff|heic)$/i.test(m.original_file_name || '') ||
+          m.title.toLowerCase().includes('screenshot')) &&
         (!m.content ||
           m.content.length < 50 ||
           m.content.startsWith('Image uploaded:') ||
-          m.content.startsWith('Uploaded file:'))
+          m.content.startsWith('Uploaded file:') ||
+          m.content.startsWith('Uploaded '))
     ).length;
   }, [memories]);
 
@@ -49,13 +57,38 @@ export const MemoryLibraryPage: React.FC = () => {
     setIsTranscribingBatch(true);
     try {
       const res = await api.transcribeAllPendingImages();
-      setTranscribeNotice(
-        `Indexed ${res.count} screenshot${res.count === 1 ? '' : 's'} with AI Vision OCR! (Failed: ${res.failed})`
-      );
+      if (res.count > 0 && res.failed === 0) {
+        setTranscribeNotice({
+          type: 'success',
+          message: `Successfully indexed ${res.count} screenshot${res.count === 1 ? '' : 's'} with AI Vision! Data, text & tables are now searchable.`,
+        });
+      } else if (res.count > 0 && res.failed > 0) {
+        setTranscribeNotice({
+          type: 'warning',
+          message: `Indexed ${res.count} screenshot${res.count === 1 ? '' : 's'}. (${res.failed} failed: missing image binary cache).`,
+          actionText: 'Re-upload in Add Memory',
+          actionLink: '/add',
+        });
+      } else if (res.count === 0 && res.failed > 0) {
+        setTranscribeNotice({
+          type: 'warning',
+          message: `Could not index ${res.failed} screenshot${res.failed === 1 ? '' : 's'}: Original image files were not stored in browser cache. Please re-upload them in "Add Memory" where AI Vision now extracts text & data immediately.`,
+          actionText: 'Go to Add Memory',
+          actionLink: '/add',
+        });
+      } else {
+        setTranscribeNotice({
+          type: 'info',
+          message: 'All screenshots are already indexed.',
+        });
+      }
       await loadMemories();
-      setTimeout(() => setTranscribeNotice(null), 6000);
+      setTimeout(() => setTranscribeNotice(null), 10000);
     } catch (err: any) {
-      setTranscribeNotice('Error indexing images: ' + (err?.message || 'Error'));
+      setTranscribeNotice({
+        type: 'warning',
+        message: 'Error indexing images: ' + (err?.message || 'Error'),
+      });
     } finally {
       setIsTranscribingBatch(false);
     }
@@ -187,12 +220,35 @@ export const MemoryLibraryPage: React.FC = () => {
 
       {/* Transcribe Notice Alert */}
       {transcribeNotice && (
-        <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-300 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span>{transcribeNotice}</span>
+        <div
+          className={`p-3.5 rounded-xl text-xs flex items-center justify-between gap-3 ${
+            transcribeNotice.type === 'success'
+              ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-300'
+              : transcribeNotice.type === 'warning'
+              ? 'bg-amber-500/10 border border-amber-500/30 text-amber-300'
+              : 'bg-blue-500/10 border border-blue-500/30 text-blue-300'
+          }`}
+        >
+          <div className="flex items-center gap-2.5 flex-1 min-w-0 flex-wrap sm:flex-nowrap">
+            {transcribeNotice.type === 'success' ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            ) : (
+              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+            )}
+            <span className="leading-relaxed">{transcribeNotice.message}</span>
+            {transcribeNotice.actionLink && (
+              <Link
+                to={transcribeNotice.actionLink}
+                className="px-2.5 py-1 rounded bg-accent text-white font-medium text-[11px] hover:brightness-110 shrink-0 whitespace-nowrap shadow-sm ml-auto sm:ml-2"
+              >
+                {transcribeNotice.actionText || 'Open'}
+              </Link>
+            )}
           </div>
-          <button onClick={() => setTranscribeNotice(null)} className="text-text-muted hover:text-text-primary">
+          <button
+            onClick={() => setTranscribeNotice(null)}
+            className="text-text-muted hover:text-text-primary p-1 shrink-0"
+          >
             <X className="w-3.5 h-3.5" />
           </button>
         </div>

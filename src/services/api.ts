@@ -2,6 +2,7 @@ import { getSupabaseClient, isSupabaseConfigured } from '../lib/supabase';
 import { Memory, Reminder, AskResponse, UserStats, Source, ChatConversation } from '../types';
 import { INITIAL_DEMO_MEMORIES, DEMO_REMINDERS, INITIAL_DEMO_CONVERSATIONS } from './demoData';
 import { geminiService } from './gemini';
+import { saveImageToIndexedDB, getImageFromIndexedDB, deleteImageFromIndexedDB } from '../utils/indexedDb';
 
 const LOCAL_STORAGE_KEY = 'memory_ai_memories_v1';
 const LOCAL_REMINDERS_KEY = 'memory_ai_reminders_v1';
@@ -43,7 +44,17 @@ function getLocalMemories(): Memory[] {
 
 function saveLocalMemories(memories: Memory[]) {
   try {
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(memories));
+    // Keep localStorage lean so high-res screenshots never trigger QuotaExceededError
+    const leanMemories = memories.map((m) => {
+      if (m.storage_path && m.storage_path.startsWith('data:') && m.storage_path.length > 500) {
+        return {
+          ...m,
+          storage_path: `indexeddb:${m.id}`,
+        };
+      }
+      return m;
+    });
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(leanMemories));
   } catch (e) {
     console.warn('Failed to save memories to local storage:', e);
   }
@@ -159,18 +170,33 @@ export const api = {
     return mems.find((m) => m.id === id) || null;
   },
 
-  async getFileUrl(storagePath?: string | null): Promise<string | null> {
-    if (!storagePath) return null;
-    if (
-      storagePath.startsWith('data:') ||
-      storagePath.startsWith('http://') ||
-      storagePath.startsWith('https://') ||
-      storagePath.startsWith('blob:')
-    ) {
-      return storagePath;
+  async getFileUrl(storagePath?: string | null, memoryId?: string | null): Promise<string | null> {
+    if (!storagePath && !memoryId) return null;
+    if (storagePath) {
+      if (
+        storagePath.startsWith('data:') ||
+        storagePath.startsWith('http://') ||
+        storagePath.startsWith('https://') ||
+        storagePath.startsWith('blob:')
+      ) {
+        return storagePath;
+      }
+      if (storagePath.startsWith('indexeddb:')) {
+        const key = storagePath.replace('indexeddb:', '');
+        const blob = await getImageFromIndexedDB(key);
+        if (blob) return blob;
+      }
+      const direct = await getImageFromIndexedDB(storagePath);
+      if (direct) return direct;
     }
+
+    if (memoryId) {
+      const byId = await getImageFromIndexedDB(memoryId);
+      if (byId) return byId;
+    }
+
     const client = getSupabaseClient();
-    if (isSupabaseConfigured() && client) {
+    if (isSupabaseConfigured() && client && storagePath) {
       try {
         const { data, error } = await client.storage
           .from('memory-files')
@@ -202,7 +228,7 @@ export const api = {
 
     const client = getSupabaseClient();
     const mimeType = file.type || 'application/octet-stream';
-    const isImage = mimeType.startsWith('image/');
+    const isImage = mimeType.startsWith('image/') || /\.(png|jpe?g|webp|gif|bmp|tiff|heic)$/i.test(file.name);
     const memoryType = isImage ? 'image' : 'document';
     const originalFileName = file.name.replace(/[^\w\.\-\s]/gi, '_');
 
@@ -210,9 +236,10 @@ export const api = {
     let storagePath: string | undefined = undefined;
     let indexingStatus: 'ready' | 'processing' | 'failed' = 'ready';
 
+    let dataUrl = '';
     // Handle file preview and Gemini vision/text extraction
     if (isImage) {
-      const dataUrl = await new Promise<string>((resolve) => {
+      dataUrl = await new Promise<string>((resolve) => {
         const reader = new FileReader();
         reader.onload = () => resolve(reader.result as string);
         reader.onerror = () => resolve('');
@@ -293,7 +320,7 @@ export const api = {
             type: memoryType,
             category,
             tags,
-            storage_path: remoteStoragePath || storagePath,
+            storage_path: remoteStoragePath || (isImage ? `indexeddb:${user.id}_${Date.now()}` : storagePath),
             original_file_name: originalFileName,
             mime_type: mimeType,
             file_size: file.size,
@@ -309,6 +336,13 @@ export const api = {
             .single();
 
           if (!insertError && inserted) {
+            if (isImage && dataUrl) {
+              await saveImageToIndexedDB(inserted.id, dataUrl);
+              await saveImageToIndexedDB(originalFileName, dataUrl);
+              if (remoteStoragePath) {
+                await saveImageToIndexedDB(remoteStoragePath, dataUrl);
+              }
+            }
             return inserted as Memory;
           } else {
             console.warn('Supabase insert memories error, falling back to local:', insertError);
@@ -320,15 +354,22 @@ export const api = {
     }
 
     // Local / Demo Mode Fallback
+    const localId = 'mem-' + Date.now();
+    if (isImage && dataUrl) {
+      await saveImageToIndexedDB(localId, dataUrl);
+      await saveImageToIndexedDB(originalFileName, dataUrl);
+    }
+    const safeStoragePath = isImage ? `indexeddb:${localId}` : storagePath;
+
     const newMemory: Memory = {
-      id: 'mem-' + Date.now(),
+      id: localId,
       user_id: 'current-user',
       title: finalTitle,
       description: finalDescription,
       type: memoryType,
       category,
       tags,
-      storage_path: storagePath,
+      storage_path: safeStoragePath,
       original_file_name: originalFileName,
       mime_type: mimeType,
       file_size: file.size,
@@ -478,19 +519,44 @@ export const api = {
   async transcribeImageMemory(memoryId: string): Promise<Memory> {
     const mem = await this.getMemory(memoryId);
     if (!mem) throw new Error('Memory not found');
-    if (mem.type !== 'image') throw new Error('Memory is not an image');
+
+    const isImage =
+      mem.type === 'image' ||
+      /\.(png|jpe?g|webp|gif|bmp|tiff|heic)$/i.test(mem.original_file_name || '') ||
+      mem.title.toLowerCase().includes('screenshot');
+
+    if (!isImage) throw new Error(`Memory "${mem.title}" is not an image`);
+
     if (!geminiService.hasApiKey()) {
       throw new Error('Gemini API Key is not configured. Please enter your API key in Settings.');
     }
 
-    let imageUrl = mem.storage_path;
+    let imageUrl: string | null = mem.storage_path || null;
+
+    // Check IndexedDB blob cache if storage_path is missing, short, or an indexeddb reference
+    if (!imageUrl || imageUrl.length < 50 || imageUrl.startsWith('indexeddb:')) {
+      const key = imageUrl?.startsWith('indexeddb:') ? imageUrl.replace('indexeddb:', '') : mem.id;
+      const cached = (await getImageFromIndexedDB(key)) || (await getImageFromIndexedDB(mem.id));
+      if (cached) imageUrl = cached;
+    }
+
     if (imageUrl && !imageUrl.startsWith('data:') && !imageUrl.startsWith('http')) {
-      const signed = await this.getFileUrl(imageUrl);
-      if (signed) imageUrl = signed;
+      const signed = await this.getFileUrl(imageUrl, mem.id);
+      if (signed) {
+        imageUrl = signed;
+      } else {
+        const cached =
+          (await getImageFromIndexedDB(mem.id)) ||
+          (await getImageFromIndexedDB(mem.original_file_name || '')) ||
+          (await getImageFromIndexedDB(imageUrl));
+        imageUrl = cached || null;
+      }
     }
 
     if (!imageUrl) {
-      throw new Error('Image data not found for transcription');
+      throw new Error(
+        `Original image for "${mem.title}" is missing from browser cache. Please re-upload this screenshot in "Add Memory".`
+      );
     }
 
     const visionResult = await geminiService.extractTextFromImage(imageUrl);
@@ -503,6 +569,7 @@ export const api = {
         ? `Visual OCR: ${visionResult.extractedText.slice(0, 160).replace(/\s+/g, ' ')}...`
         : mem.description,
       indexing_status: 'ready',
+      type: 'image',
     };
 
     const updated = await this.updateMemory(memoryId, updates);
@@ -512,30 +579,41 @@ export const api = {
   /**
    * Batch transcribe all image memories that have missing or placeholder content.
    */
-  async transcribeAllPendingImages(): Promise<{ count: number; failed: number }> {
+  async transcribeAllPendingImages(): Promise<{ count: number; failed: number; errors: string[] }> {
     if (!geminiService.hasApiKey()) {
       throw new Error('Gemini API Key is not configured. Please add your key in Settings.');
     }
 
     const memories = await this.listMemories();
     const pendingImages = memories.filter(
-      (m) => m.type === 'image' && (!m.content || m.content.startsWith('Image uploaded:') || m.content.startsWith('Uploaded file:') || m.content.length < 50)
+      (m) =>
+        (m.type === 'image' ||
+          /\.(png|jpe?g|webp|gif|bmp|tiff|heic)$/i.test(m.original_file_name || '') ||
+          m.title.toLowerCase().includes('screenshot')) &&
+        (!m.content ||
+          m.content.startsWith('Image uploaded:') ||
+          m.content.startsWith('Uploaded file:') ||
+          m.content.startsWith('Uploaded ') ||
+          m.content.length < 60)
     );
 
     let count = 0;
     let failed = 0;
+    const errors: string[] = [];
 
     for (const mem of pendingImages) {
       try {
         await this.transcribeImageMemory(mem.id);
         count++;
-      } catch (err) {
-        console.warn(`Failed to transcribe memory ${mem.id}:`, err);
+      } catch (err: any) {
+        const errMsg = err?.message || 'Failed to transcribe screenshot';
+        console.warn(`Failed to transcribe memory ${mem.id}:`, errMsg);
         failed++;
+        if (!errors.includes(errMsg)) errors.push(errMsg);
       }
     }
 
-    return { count, failed };
+    return { count, failed, errors };
   },
 
   async askMemory(question: string, _conversationId?: string): Promise<AskResponse> {
@@ -571,18 +649,32 @@ export const api = {
       try {
         // Auto-transcribe any unindexed screenshots on-the-fly (up to 12 items)
         const pendingImages = memories.filter(
-          (m) => m.type === 'image' && m.storage_path && (!m.content || m.content.startsWith('Image uploaded:') || m.content.startsWith('Uploaded file:') || m.content.length < 50)
+          (m) =>
+            (m.type === 'image' ||
+              /\.(png|jpe?g|webp|gif|bmp|tiff|heic)$/i.test(m.original_file_name || '') ||
+              m.title.toLowerCase().includes('screenshot')) &&
+            (!m.content ||
+              m.content.startsWith('Image uploaded:') ||
+              m.content.startsWith('Uploaded file:') ||
+              m.content.startsWith('Uploaded ') ||
+              m.content.length < 50)
         );
 
         if (pendingImages.length > 0 && pendingImages.length <= 15) {
           await Promise.allSettled(
             pendingImages.map(async (pim) => {
               try {
-                let imgPath = pim.storage_path!;
-                if (!imgPath.startsWith('data:') && !imgPath.startsWith('http')) {
-                  const signed = await this.getFileUrl(imgPath);
-                  if (signed) imgPath = signed;
+                let imgPath: string | null = pim.storage_path || null;
+                if (imgPath && !imgPath.startsWith('data:') && !imgPath.startsWith('http')) {
+                  imgPath = await this.getFileUrl(imgPath, pim.id);
                 }
+                if (!imgPath) {
+                  imgPath =
+                    (await getImageFromIndexedDB(pim.id)) ||
+                    (await getImageFromIndexedDB(pim.original_file_name || ''));
+                }
+                if (!imgPath) return;
+
                 const res = await geminiService.extractTextFromImage(imgPath);
                 if (res.extractedText) {
                   pim.content = res.extractedText;
@@ -856,6 +948,10 @@ export const api = {
 
     const rems = getLocalReminders().filter((r) => r.source_memory_id !== memoryId);
     saveLocalReminders(rems);
+
+    try {
+      await deleteImageFromIndexedDB(memoryId);
+    } catch {}
   },
 
   async toggleFavorite(memoryId: string): Promise<Memory | null> {

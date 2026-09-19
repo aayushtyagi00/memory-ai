@@ -107,7 +107,8 @@ export const AddMemoryPage: React.FC = () => {
     setVisionExtractedText(null);
 
     // If image, create preview
-    if (file.type.startsWith('image/')) {
+    const isImage = file.type.startsWith('image/') || /\.(png|jpe?g|webp|gif|bmp|tiff|heic)$/i.test(file.name);
+    if (isImage) {
       const url = URL.createObjectURL(file);
       setPreviewUrl(url);
 
@@ -135,14 +136,17 @@ export const AddMemoryPage: React.FC = () => {
       setVisionExtractedText(null);
       setErrorMessage(null);
 
-      const queue = fileList.map((f, i) => ({
-        id: `batch-${Date.now()}-${i}`,
-        file: f,
-        title: f.name.replace(/\.[^/.]+$/, ''),
-        category: 'General',
-        tags: f.type.startsWith('image/') ? ['screenshot', 'image'] : ['document'],
-        status: 'pending' as const,
-      }));
+      const queue = fileList.map((f, i) => {
+        const isImg = f.type.startsWith('image/') || /\.(png|jpe?g|webp|gif|bmp|tiff|heic)$/i.test(f.name);
+        return {
+          id: `batch-${Date.now()}-${i}`,
+          file: f,
+          title: f.name.replace(/\.[^/.]+$/, ''),
+          category: 'General',
+          tags: isImg ? ['screenshot', 'image'] : ['document'],
+          status: 'pending' as const,
+        };
+      });
       setBatchQueue(queue);
     }
   };
@@ -316,7 +320,8 @@ export const AddMemoryPage: React.FC = () => {
         let category = item.category;
         let tags = item.tags;
 
-        if (item.file.type.startsWith('image/') && hasApiKey) {
+        const isImage = item.file.type.startsWith('image/') || /\.(png|jpe?g|webp|gif|bmp|tiff|heic)$/i.test(item.file.name);
+        if (isImage && hasApiKey) {
           try {
             setBatchQueue((prev) =>
               prev.map((q, idx) => (idx === i ? { ...q, status: 'extracting' } : q))
@@ -329,7 +334,7 @@ export const AddMemoryPage: React.FC = () => {
               tags = Array.from(new Set([...tags, ...visionResult.tags]));
             }
           } catch (vErr) {
-            console.warn('Batch OCR extraction skipped for', item.file.name, vErr);
+            console.warn('Batch OCR extraction notice for', item.file.name, vErr);
           }
         }
 

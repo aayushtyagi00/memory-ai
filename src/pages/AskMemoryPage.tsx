@@ -23,6 +23,7 @@ import {
   History,
   MessageSquare,
   Trash2,
+  AlertCircle,
   X
 } from 'lucide-react';
 
@@ -57,7 +58,12 @@ export const AskMemoryPage: React.FC = () => {
   const [modalKeyInput, setModalKeyInput] = useState('');
   const [unindexedImagesCount, setUnindexedImagesCount] = useState(0);
   const [isTranscribingBatch, setIsTranscribingBatch] = useState(false);
-  const [transcribeNotice, setTranscribeNotice] = useState<string | null>(null);
+  const [transcribeNotice, setTranscribeNotice] = useState<{
+    type: 'success' | 'warning' | 'info';
+    message: string;
+    actionText?: string;
+    actionLink?: string;
+  } | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -74,11 +80,14 @@ export const AskMemoryPage: React.FC = () => {
       const list = await api.listMemories();
       const count = list.filter(
         (m) =>
-          m.type === 'image' &&
+          (m.type === 'image' ||
+            /\.(png|jpe?g|webp|gif|bmp|tiff|heic)$/i.test(m.original_file_name || '') ||
+            m.title.toLowerCase().includes('screenshot')) &&
           (!m.content ||
             m.content.length < 50 ||
             m.content.startsWith('Image uploaded:') ||
-            m.content.startsWith('Uploaded file:'))
+            m.content.startsWith('Uploaded file:') ||
+            m.content.startsWith('Uploaded '))
       ).length;
       setUnindexedImagesCount(count);
     } catch {
@@ -94,13 +103,38 @@ export const AskMemoryPage: React.FC = () => {
     setIsTranscribingBatch(true);
     try {
       const result = await api.transcribeAllPendingImages();
-      setTranscribeNotice(
-        `Indexed ${result.count} screenshot${result.count === 1 ? '' : 's'} with AI Vision! Data, text & tables are now searchable in chat.`
-      );
+      if (result.count > 0 && result.failed === 0) {
+        setTranscribeNotice({
+          type: 'success',
+          message: `Successfully indexed all ${result.count} screenshot${result.count === 1 ? '' : 's'} with AI Vision! Data, text & tables are now searchable in chat.`,
+        });
+      } else if (result.count > 0 && result.failed > 0) {
+        setTranscribeNotice({
+          type: 'warning',
+          message: `Indexed ${result.count} screenshot${result.count === 1 ? '' : 's'}. (${result.failed} failed: missing image cache).`,
+          actionText: 'Re-upload in Add Memory',
+          actionLink: '/add',
+        });
+      } else if (result.count === 0 && result.failed > 0) {
+        setTranscribeNotice({
+          type: 'warning',
+          message: `Could not index ${result.failed} screenshot${result.failed === 1 ? '' : 's'}: Original image files were not stored in browser cache. Please re-upload them in "Add Memory" where AI Vision now extracts all text & data immediately.`,
+          actionText: 'Go to Add Memory',
+          actionLink: '/add',
+        });
+      } else {
+        setTranscribeNotice({
+          type: 'info',
+          message: 'All screenshots are already fully indexed.',
+        });
+      }
       await checkUnindexedImages();
-      setTimeout(() => setTranscribeNotice(null), 6000);
+      setTimeout(() => setTranscribeNotice(null), 10000);
     } catch (err: any) {
-      setTranscribeNotice('Notice: ' + (err?.message || 'Error transcribing images'));
+      setTranscribeNotice({
+        type: 'warning',
+        message: 'Notice: ' + (err?.message || 'Error transcribing images'),
+      });
     } finally {
       setIsTranscribingBatch(false);
     }
@@ -539,12 +573,35 @@ export const AskMemoryPage: React.FC = () => {
 
         {/* Transcribe Notice Alert */}
         {transcribeNotice && (
-          <div className="mx-4 md:mx-6 mt-2 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-300 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <FileCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span>{transcribeNotice}</span>
+          <div
+            className={`mx-4 md:mx-6 mt-2 p-3 rounded-xl text-xs flex items-center justify-between gap-3 ${
+              transcribeNotice.type === 'success'
+                ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-300'
+                : transcribeNotice.type === 'warning'
+                ? 'bg-amber-500/10 border border-amber-500/30 text-amber-300'
+                : 'bg-blue-500/10 border border-blue-500/30 text-blue-300'
+            }`}
+          >
+            <div className="flex items-center gap-2.5 flex-1 min-w-0 flex-wrap sm:flex-nowrap">
+              {transcribeNotice.type === 'success' ? (
+                <FileCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+              ) : (
+                <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+              )}
+              <span className="leading-relaxed">{transcribeNotice.message}</span>
+              {transcribeNotice.actionLink && (
+                <Link
+                  to={transcribeNotice.actionLink}
+                  className="px-2.5 py-1 rounded bg-accent text-white font-medium text-[11px] hover:brightness-110 shrink-0 whitespace-nowrap shadow-sm ml-auto sm:ml-2"
+                >
+                  {transcribeNotice.actionText || 'Open'}
+                </Link>
+              )}
             </div>
-            <button onClick={() => setTranscribeNotice(null)} className="text-text-muted hover:text-text-primary">
+            <button
+              onClick={() => setTranscribeNotice(null)}
+              className="text-text-muted hover:text-text-primary p-1 shrink-0"
+            >
               <X className="w-3.5 h-3.5" />
             </button>
           </div>

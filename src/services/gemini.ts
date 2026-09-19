@@ -1,4 +1,5 @@
 import { Memory, Source, Reminder, AskResponse } from '../types';
+import { getImageFromIndexedDB } from '../utils/indexedDb';
 
 const STORAGE_API_KEY = 'memory_ai_gemini_api_key';
 const STORAGE_MODEL_KEY = 'memory_ai_gemini_model';
@@ -450,6 +451,13 @@ Respond strictly with valid JSON.`;
           reader.onerror = reject;
           reader.readAsDataURL(blob);
         });
+      } else if (fileOrUrl.startsWith('indexeddb:')) {
+        const key = fileOrUrl.replace('indexeddb:', '');
+        const data = await getImageFromIndexedDB(key);
+        if (!data) throw new Error('Image data is missing from local IndexedDB cache.');
+        return this.extractTextFromImage(data);
+      } else if (!fileOrUrl.startsWith('/') && fileOrUrl.includes('/') && !fileOrUrl.includes(';base64,')) {
+        throw new Error(`Cannot parse remote storage path "${fileOrUrl}" directly without signed URL.`);
       } else {
         base64Data = fileOrUrl;
       }
