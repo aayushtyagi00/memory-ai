@@ -16,7 +16,9 @@ import {
   PlusCircle,
   Trash2,
   Sparkles,
-  ExternalLink
+  ExternalLink,
+  Zap,
+  X
 } from 'lucide-react';
 
 export const MemoryLibraryPage: React.FC = () => {
@@ -28,6 +30,36 @@ export const MemoryLibraryPage: React.FC = () => {
   const [selectedType, setSelectedType] = useState<'all' | 'document' | 'note' | 'image'>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'title'>('newest');
+
+  const [isTranscribingBatch, setIsTranscribingBatch] = useState(false);
+  const [transcribeNotice, setTranscribeNotice] = useState<string | null>(null);
+
+  const unindexedImagesCount = useMemo(() => {
+    return memories.filter(
+      (m) =>
+        m.type === 'image' &&
+        (!m.content ||
+          m.content.length < 50 ||
+          m.content.startsWith('Image uploaded:') ||
+          m.content.startsWith('Uploaded file:'))
+    ).length;
+  }, [memories]);
+
+  const handleIndexAllImages = async () => {
+    setIsTranscribingBatch(true);
+    try {
+      const res = await api.transcribeAllPendingImages();
+      setTranscribeNotice(
+        `Indexed ${res.count} screenshot${res.count === 1 ? '' : 's'} with AI Vision OCR! (Failed: ${res.failed})`
+      );
+      await loadMemories();
+      setTimeout(() => setTranscribeNotice(null), 6000);
+    } catch (err: any) {
+      setTranscribeNotice('Error indexing images: ' + (err?.message || 'Error'));
+    } finally {
+      setIsTranscribingBatch(false);
+    }
+  };
 
   useEffect(() => {
     loadMemories();
@@ -119,6 +151,53 @@ export const MemoryLibraryPage: React.FC = () => {
         </Link>
       </div>
 
+      {/* Unindexed Screenshots Banner */}
+      {unindexedImagesCount > 0 && (
+        <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2.5">
+            <Zap className="w-4 h-4 text-amber-400 shrink-0 animate-pulse" />
+            <div>
+              <span className="font-semibold text-text-primary">
+                {unindexedImagesCount} screenshot{unindexedImagesCount > 1 ? 's need' : ' needs'} AI Vision indexing
+              </span>
+              <p className="text-[11px] text-text-muted mt-0.5">
+                Run OCR transcription across your screenshots so their text, tables, and receipts can be searched and cited by the AI.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={handleIndexAllImages}
+            disabled={isTranscribingBatch}
+            className="px-4 py-2 rounded-xl bg-accent text-white font-medium text-xs hover:brightness-110 flex items-center gap-1.5 shrink-0 shadow-sm disabled:opacity-50"
+          >
+            {isTranscribingBatch ? (
+              <>
+                <Clock className="w-3.5 h-3.5 animate-spin" />
+                <span>Indexing ({unindexedImagesCount})...</span>
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Index All With AI Vision</span>
+              </>
+            )}
+          </button>
+        </div>
+      )}
+
+      {/* Transcribe Notice Alert */}
+      {transcribeNotice && (
+        <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-300 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>{transcribeNotice}</span>
+          </div>
+          <button onClick={() => setTranscribeNotice(null)} className="text-text-muted hover:text-text-primary">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* Search & Filter Toolbar */}
       <div className="p-4 rounded-2xl bg-bg-elevated border border-border flex flex-col md:flex-row gap-4 items-center justify-between">
         {/* Search */}
@@ -199,9 +278,22 @@ export const MemoryLibraryPage: React.FC = () => {
             >
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <span className="font-mono text-[9px] uppercase px-2 py-0.5 rounded bg-bg-base border border-border text-text-muted">
-                    {m.category || 'General'}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-mono text-[9px] uppercase px-2 py-0.5 rounded bg-bg-base border border-border text-text-muted">
+                      {m.category || 'General'}
+                    </span>
+                    {m.type === 'image' && (
+                      m.content && m.content.length > 50 && !m.content.startsWith('Image uploaded:') ? (
+                        <span className="font-mono text-[8px] uppercase px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                          OCR Ready
+                        </span>
+                      ) : (
+                        <span className="font-mono text-[8px] uppercase px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                          OCR Pending
+                        </span>
+                      )
+                    )}
+                  </div>
 
                   <div className="flex items-center gap-2">
                     <button

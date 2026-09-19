@@ -201,7 +201,9 @@ export const geminiService = {
     const qTerms = question
       .toLowerCase()
       .split(/\s+/)
-      .filter((w) => w.length > 2 && !['what', 'when', 'where', 'which', 'does', 'have', 'from', 'with', 'about', 'this', 'that', 'tell'].includes(w));
+      .filter((w) => w.length > 2 && !['what', 'when', 'where', 'which', 'does', 'have', 'from', 'with', 'about', 'this', 'that', 'tell', 'show', 'give'].includes(w));
+
+    const isVisualQuery = /screenshot|image|photo|picture|pic|receipt|bill|slip|table|score|chart|view|scan|camera|capture|upload/i.test(question);
 
     const scoredMemories = [...memories].sort((a, b) => {
       let scoreA = 0;
@@ -210,48 +212,86 @@ export const geminiService = {
       const textB = `${b.title} ${b.description || ''} ${b.original_file_name || ''} ${b.content || ''} ${b.tags?.join(' ') || ''}`.toLowerCase();
 
       for (const t of qTerms) {
-        if (textA.includes(t)) scoreA += 1;
-        if (a.title.toLowerCase().includes(t)) scoreA += 3;
-        if (textB.includes(t)) scoreB += 1;
-        if (b.title.toLowerCase().includes(t)) scoreB += 3;
+        if (textA.includes(t)) scoreA += 2;
+        if (a.title.toLowerCase().includes(t)) scoreA += 4;
+        if (textB.includes(t)) scoreB += 2;
+        if (b.title.toLowerCase().includes(t)) scoreB += 4;
       }
+
+      if (isVisualQuery) {
+        if (a.type === 'image') scoreA += 6;
+        if (b.type === 'image') scoreB += 6;
+      }
+
+      // Prioritize user-uploaded / custom memories over initial demo memories
+      if (!a.id.startsWith('demo-mem-') && b.id.startsWith('demo-mem-')) {
+        scoreA += 8;
+      } else if (a.id.startsWith('demo-mem-') && !b.id.startsWith('demo-mem-')) {
+        scoreB += 8;
+      }
+
       return scoreB - scoreA;
     });
 
     // Format top memories for grounding (cap at 30 most relevant)
     const candidates = scoredMemories.slice(0, 30);
     const formattedMemories = candidates.map((m, idx) => {
+      const isScreenshot = m.type === 'image';
       return `--- MEMORY ITEM [${idx + 1}] ---
 ID: ${m.id}
 Title: ${m.title}
 Filename: ${m.original_file_name || m.title}
-Type: ${m.type}
+Type: ${m.type}${isScreenshot ? ' (Screenshot / Image OCR Transcription)' : ''}
 Category: ${m.category || 'General'}
 Tags: ${m.tags?.join(', ') || 'none'}
 Content:
-${m.content || m.description || '(No explicit content)'}
+${m.content || m.description || '(No explicit text transcribed)'}
 ---------------------------`;
     }).join('\n\n');
+
+    // Attach inline visual data for top image candidates if available
+    const inlineData: { mimeType: string; data: string }[] = [];
+    const imageCandidates = candidates
+      .filter((c) => c.type === 'image' && c.storage_path?.startsWith('data:image/'))
+      .slice(0, 3);
+
+    for (const img of imageCandidates) {
+      if (img.storage_path) {
+        try {
+          const parts = img.storage_path.split(',');
+          const mimeMatch = parts[0].match(/data:(.*?);base64/);
+          if (mimeMatch && parts[1]) {
+            inlineData.push({
+              mimeType: mimeMatch[1],
+              data: parts[1],
+            });
+          }
+        } catch (e) {
+          console.warn('Could not attach inline image data for candidate:', img.id, e);
+        }
+      }
+    }
 
     const systemInstruction = `You are Memory AI, a private personal information retrieval assistant.
 Answer user questions using ONLY information retrieved from the user's stored memories provided below.
 
 Strict Grounding & Citation Rules:
 1. Ground every statement strictly in the provided memories. Do NOT invent, assume, or hallucinate facts outside the memories.
-2. If the answer cannot be found in the memories, your answer MUST be exactly:
+2. If the user is asking about an uploaded screenshot or image, check the (Screenshot / Image OCR Transcription) items carefully.
+3. If the answer cannot be found in the memories, your answer MUST be exactly:
    "I couldn't find this information in your memories."
    Set foundInformation to false and sources to [].
-3. For any found information, you MUST cite the specific memory source in the "sources" list:
+4. For any found information, you MUST cite the specific memory source in the "sources" list:
    - memoryId: You MUST use the exact "ID" string of the specific memory item you retrieved the fact from (e.g. "ID: xyz"). NEVER cite a memory that does not contain the answer.
    - title: Exact title of that specific memory item
    - fileName: Exact Filename of that specific memory item
    - citation: Filename or Title
    - type: document | image | note
    - snippet: Exact sentence or excerpt from that memory that proves your answer
-4. If sources conflict (e.g. differing dates, differing amounts, differing status across documents), do NOT silently choose one.
+5. If sources conflict (e.g. differing dates, differing amounts, differing status across documents), do NOT silently choose one.
    Set conflictDetected to true, clearly state in your answer that sources conflict, and cite both conflicting sources.
-5. If the question is a general conversation or unrelated question, reply that Memory AI is focused on searching and retrieving their personal memories.
-6. You MUST format your final response strictly as valid JSON matching this structure:
+6. If the question is a general conversation or unrelated question, reply that Memory AI is focused on searching and retrieving their personal memories.
+7. You MUST format your final response strictly as valid JSON matching this structure:
 {
   "answer": "string",
   "foundInformation": true,
@@ -279,6 +319,7 @@ Provide the JSON response now:`;
     try {
       const responseText = await this.callGenerateContent(userPrompt, systemInstruction, {
         temperature: 0.1,
+        inlineData: inlineData.length > 0 ? inlineData : undefined,
         responseSchemaJson: true,
       });
 
@@ -290,7 +331,22 @@ Provide the JSON response now:`;
         cleaned = cleaned.replace(/^```\s*/, '').replace(/\s*```$/, '');
       }
 
-      const parsed = JSON.parse(cleaned);
+      let parsed: any;
+      try {
+        parsed = JSON.parse(cleaned);
+      } catch {
+        const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          parsed = JSON.parse(jsonMatch[0]);
+        } else {
+          parsed = {
+            answer: cleaned,
+            foundInformation: false,
+            conflictDetected: false,
+            sources: [],
+          };
+        }
+      }
 
       // Verify sources strictly against actual memories
       const verifiedSources: Source[] = (parsed.sources || [])
@@ -366,26 +422,60 @@ Respond strictly with valid JSON.`;
 
   /**
    * Multimodal Vision: Transcribe and understand images/screenshots using Gemini Vision.
+   * Supports File object, base64 data URL, or remote/blob image URL.
    */
-  async extractTextFromImage(file: File): Promise<{ extractedText: string; title: string; category: string; tags: string[] }> {
-    // Convert file to base64
-    const base64Data = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const result = reader.result as string;
-        const base64 = result.split(',')[1];
-        resolve(base64);
-      };
-      reader.onerror = (e) => reject(e);
-      reader.readAsDataURL(file);
-    });
+  async extractTextFromImage(
+    fileOrUrl: File | string,
+    providedMimeType?: string
+  ): Promise<{ extractedText: string; title: string; category: string; tags: string[] }> {
+    let base64Data = '';
+    let mimeType = providedMimeType || 'image/jpeg';
 
-    const mimeType = file.type || 'image/jpeg';
-    const prompt = `Carefully examine this image (receipt, document, screenshot, or schedule).
-1. Transcribe ALL visible text, numbers, dates, references, items, and figures accurately.
+    if (typeof fileOrUrl === 'string') {
+      if (fileOrUrl.startsWith('data:')) {
+        const parts = fileOrUrl.split(',');
+        const mimeMatch = parts[0].match(/data:(.*?);base64/);
+        if (mimeMatch) mimeType = mimeMatch[1];
+        base64Data = parts[1] || '';
+      } else if (fileOrUrl.startsWith('http://') || fileOrUrl.startsWith('https://')) {
+        const resp = await fetch(fileOrUrl);
+        const blob = await resp.blob();
+        mimeType = blob.type || mimeType;
+        base64Data = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const result = reader.result as string;
+            resolve(result.split(',')[1] || '');
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+      } else {
+        base64Data = fileOrUrl;
+      }
+    } else {
+      mimeType = fileOrUrl.type || 'image/jpeg';
+      base64Data = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result as string;
+          const base64 = result.split(',')[1];
+          resolve(base64);
+        };
+        reader.onerror = (e) => reject(e);
+        reader.readAsDataURL(fileOrUrl);
+      });
+    }
+
+    if (!base64Data) {
+      throw new Error('No valid image data available for vision extraction.');
+    }
+
+    const prompt = `Carefully examine this image (receipt, document, screenshot, chat, schedule, or table).
+1. Transcribe ALL visible text, numbers, labels, dates, codes, transactions, and details accurately.
 2. Provide:
-- "extractedText": full clean text transcription and structured breakdown of all details
-- "title": appropriate title for this image (e.g. "Hostel Fee Receipt", "Exam Time Table")
+- "extractedText": exhaustive clean text transcription and structured breakdown of all visible text and data
+- "title": appropriate concise descriptive title for this image (e.g. "Semester Exam Schedule", "Electricity Bill", "WhatsApp Chat with Alex")
 - "category": one of ["Academic", "Financial", "Career", "Personal", "Meeting", "General"]
 - "tags": 3-5 lowercase keyword tags
 
@@ -410,7 +500,20 @@ Output valid JSON matching this schema:
       cleaned = cleaned.replace(/^```\s*/, '').replace(/\s*```$/, '');
     }
 
-    return JSON.parse(cleaned);
+    try {
+      return JSON.parse(cleaned);
+    } catch {
+      const match = cleaned.match(/\{[\s\S]*\}/);
+      if (match) {
+        return JSON.parse(match[0]);
+      }
+      return {
+        extractedText: cleaned,
+        title: 'Screenshot Memory',
+        category: 'General',
+        tags: ['screenshot', 'image'],
+      };
+    }
   },
 
   /**

@@ -55,15 +55,56 @@ export const AskMemoryPage: React.FC = () => {
   const [hasApiKey, setHasApiKey] = useState(geminiService.hasApiKey());
   const [showKeyModal, setShowKeyModal] = useState(false);
   const [modalKeyInput, setModalKeyInput] = useState('');
+  const [unindexedImagesCount, setUnindexedImagesCount] = useState(0);
+  const [isTranscribingBatch, setIsTranscribingBatch] = useState(false);
+  const [transcribeNotice, setTranscribeNotice] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Load conversations on mount
+  // Load conversations and check memories on mount
   useEffect(() => {
     setHasApiKey(geminiService.hasApiKey());
     loadConversationsList();
+    checkUnindexedImages();
   }, []);
+
+  const checkUnindexedImages = async () => {
+    try {
+      const list = await api.listMemories();
+      const count = list.filter(
+        (m) =>
+          m.type === 'image' &&
+          (!m.content ||
+            m.content.length < 50 ||
+            m.content.startsWith('Image uploaded:') ||
+            m.content.startsWith('Uploaded file:'))
+      ).length;
+      setUnindexedImagesCount(count);
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleIndexAllImages = async () => {
+    if (!geminiService.hasApiKey()) {
+      setShowKeyModal(true);
+      return;
+    }
+    setIsTranscribingBatch(true);
+    try {
+      const result = await api.transcribeAllPendingImages();
+      setTranscribeNotice(
+        `Indexed ${result.count} screenshot${result.count === 1 ? '' : 's'} with AI Vision! Data, text & tables are now searchable in chat.`
+      );
+      await checkUnindexedImages();
+      setTimeout(() => setTranscribeNotice(null), 6000);
+    } catch (err: any) {
+      setTranscribeNotice('Notice: ' + (err?.message || 'Error transcribing images'));
+    } finally {
+      setIsTranscribingBatch(false);
+    }
+  };
 
   const loadConversationsList = () => {
     const list = api.listConversations();
@@ -462,6 +503,53 @@ export const AskMemoryPage: React.FC = () => {
           </div>
         )}
 
+        {/* Unindexed Screenshots Banner */}
+        {unindexedImagesCount > 0 && (
+          <div className="mx-4 md:mx-6 mt-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2.5">
+              <Zap className="w-4 h-4 text-amber-400 shrink-0 animate-pulse" />
+              <div>
+                <span className="font-semibold text-text-primary">
+                  {unindexedImagesCount} screenshot{unindexedImagesCount > 1 ? 's need' : ' needs'} AI Vision indexing
+                </span>
+                <p className="text-[11px] text-text-muted mt-0.5">
+                  Transcribe your uploaded screenshots so Memory AI can read all text, tables and receipts inside them.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={handleIndexAllImages}
+              disabled={isTranscribingBatch}
+              className="px-3.5 py-1.5 rounded-lg bg-accent text-white font-medium text-xs hover:brightness-110 flex items-center gap-1.5 shrink-0 shadow-sm disabled:opacity-50"
+            >
+              {isTranscribingBatch ? (
+                <>
+                  <Clock className="w-3.5 h-3.5 animate-spin" />
+                  <span>Indexing Screenshots...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Index All Screenshots</span>
+                </>
+              )}
+            </button>
+          </div>
+        )}
+
+        {/* Transcribe Notice Alert */}
+        {transcribeNotice && (
+          <div className="mx-4 md:mx-6 mt-2 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-300 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FileCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>{transcribeNotice}</span>
+            </div>
+            <button onClick={() => setTranscribeNotice(null)} className="text-text-muted hover:text-text-primary">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+
         {/* Message Thread */}
         <div className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col gap-5">
           {messages.length === 0 ? (
@@ -665,7 +753,7 @@ export const AskMemoryPage: React.FC = () => {
         </div>
 
         <div className="pt-3 border-t border-border text-[10px] font-mono text-text-muted flex items-center justify-between">
-          <span>{hasApiKey ? 'Gemini 2.5 Flash' : 'Synthetic Dataset'}</span>
+          <span>{hasApiKey ? geminiService.getModel() : 'Synthetic Dataset'}</span>
           <span className="text-success">Verified Grounded</span>
         </div>
       </div>

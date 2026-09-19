@@ -42,6 +42,22 @@ export const AddMemoryPage: React.FC = () => {
   const [visionExtracting, setVisionExtracting] = useState(false);
   const [visionExtractedText, setVisionExtractedText] = useState<string | null>(null);
 
+  // Batch Upload State (for multi-file / multi-screenshot uploads)
+  const [batchQueue, setBatchQueue] = useState<
+    {
+      id: string;
+      file: File;
+      title: string;
+      category: string;
+      tags: string[];
+      status: 'pending' | 'extracting' | 'uploading' | 'done' | 'failed';
+      extractedText?: string;
+      error?: string;
+    }[]
+  >([]);
+  const [isBatchProcessing, setIsBatchProcessing] = useState(false);
+  const [batchIndex, setBatchIndex] = useState(0);
+
   // Note State
   const [noteTitle, setNoteTitle] = useState('');
   const [noteCategory, setNoteCategory] = useState('Personal');
@@ -68,8 +84,8 @@ export const AddMemoryPage: React.FC = () => {
 
   const ALLOWED_EXTENSIONS = ['.pdf', '.txt', '.md', '.png', '.jpg', '.jpeg', '.webp', '.doc', '.docx', '.csv', '.json', '.xlsx'];
 
-  // File Selection
-  const handleFileChange = async (file: File) => {
+  // Single File Selection
+  const handleSingleFileChange = async (file: File) => {
     const ext = '.' + file.name.split('.').pop()?.toLowerCase();
     if (!ALLOWED_EXTENSIONS.includes(ext)) {
       setErrorMessage(`Unsupported file format (${ext}). Supported formats: PDF, Word (DOCX), Text, Markdown, CSV, JSON, and Images (PNG, JPG, WEBP).`);
@@ -95,12 +111,39 @@ export const AddMemoryPage: React.FC = () => {
       const url = URL.createObjectURL(file);
       setPreviewUrl(url);
 
-      // If Gemini is active, offer automatic vision analysis
+      // If Gemini is active, run automatic vision analysis
       if (hasApiKey) {
         handleVisionExtract(file);
       }
     } else {
       setPreviewUrl(null);
+    }
+  };
+
+  // Multiple / Batch File Selection
+  const handleFilesSelected = (files: FileList | File[]) => {
+    const fileList = Array.from(files);
+    if (fileList.length === 0) return;
+
+    if (fileList.length === 1) {
+      setBatchQueue([]);
+      handleSingleFileChange(fileList[0]);
+    } else {
+      setSelectedFile(null);
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(null);
+      setVisionExtractedText(null);
+      setErrorMessage(null);
+
+      const queue = fileList.map((f, i) => ({
+        id: `batch-${Date.now()}-${i}`,
+        file: f,
+        title: f.name.replace(/\.[^/.]+$/, ''),
+        category: 'General',
+        tags: f.type.startsWith('image/') ? ['screenshot', 'image'] : ['document'],
+        status: 'pending' as const,
+      }));
+      setBatchQueue(queue);
     }
   };
 
@@ -125,8 +168,8 @@ export const AddMemoryPage: React.FC = () => {
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFileChange(e.dataTransfer.files[0]);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleFilesSelected(e.dataTransfer.files);
     }
   };
 
@@ -187,7 +230,7 @@ export const AddMemoryPage: React.FC = () => {
     }
   };
 
-  // Submit Upload
+  // Submit Single File Upload
   const handleUploadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedFile) return;
@@ -211,7 +254,24 @@ export const AddMemoryPage: React.FC = () => {
         setUploadStatus('processing');
       }, 600);
 
-      const mem = await api.uploadMemory(selectedFile, fileTitle, fileCategory, fileTags);
+      let textToUse = visionExtractedText || undefined;
+      // If user submitted while OCR was in-flight, await brief completion
+      if (!textToUse && selectedFile.type.startsWith('image/') && hasApiKey && visionExtracting) {
+        let attempts = 0;
+        while (visionExtracting && attempts < 8) {
+          await new Promise((r) => setTimeout(r, 400));
+          attempts++;
+        }
+        textToUse = visionExtractedText || undefined;
+      }
+
+      const mem = await api.uploadMemory(
+        selectedFile,
+        fileTitle,
+        fileCategory,
+        fileTags,
+        textToUse
+      );
 
       clearInterval(progressTimer);
       setUploadProgress(100);
@@ -234,6 +294,60 @@ export const AddMemoryPage: React.FC = () => {
       setUploadStatus('failed');
       setErrorMessage(err?.message || 'Upload and indexing failed');
     }
+  };
+
+  // Submit Batch Upload (Multi-screenshot / Multi-file)
+  const handleBatchUpload = async () => {
+    if (batchQueue.length === 0 || isBatchProcessing) return;
+    setIsBatchProcessing(true);
+    setErrorMessage(null);
+
+    for (let i = 0; i < batchQueue.length; i++) {
+      setBatchIndex(i);
+      const item = batchQueue[i];
+
+      setBatchQueue((prev) =>
+        prev.map((q, idx) => (idx === i ? { ...q, status: 'uploading' } : q))
+      );
+
+      try {
+        let extractedText: string | undefined = undefined;
+        let title = item.title;
+        let category = item.category;
+        let tags = item.tags;
+
+        if (item.file.type.startsWith('image/') && hasApiKey) {
+          try {
+            setBatchQueue((prev) =>
+              prev.map((q, idx) => (idx === i ? { ...q, status: 'extracting' } : q))
+            );
+            const visionResult = await geminiService.extractTextFromImage(item.file);
+            extractedText = visionResult.extractedText;
+            if (visionResult.title) title = visionResult.title;
+            if (visionResult.category) category = visionResult.category;
+            if (visionResult.tags && visionResult.tags.length > 0) {
+              tags = Array.from(new Set([...tags, ...visionResult.tags]));
+            }
+          } catch (vErr) {
+            console.warn('Batch OCR extraction skipped for', item.file.name, vErr);
+          }
+        }
+
+        await api.uploadMemory(item.file, title, category, tags, extractedText);
+        setBatchQueue((prev) =>
+          prev.map((q, idx) => (idx === i ? { ...q, status: 'done', title } : q))
+        );
+      } catch (err: any) {
+        setBatchQueue((prev) =>
+          prev.map((q, idx) => (idx === i ? { ...q, status: 'failed', error: err?.message || 'Failed' } : q))
+        );
+      }
+    }
+
+    setIsBatchProcessing(false);
+    setTimeout(() => {
+      navigate('/memories');
+    }, 1200);
   };
 
   // Submit Note
@@ -313,187 +427,318 @@ export const AddMemoryPage: React.FC = () => {
       {/* Tab 1: File Upload */}
       {activeTab === 'upload' && (
         <form onSubmit={handleUploadSubmit} className="flex flex-col gap-6">
-          {/* Drag and drop zone */}
-          <div
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={handleDrop}
-            onClick={() => fileInputRef.current?.click()}
-            className={`border-2 border-dashed rounded-2xl p-8 flex flex-col items-center justify-center text-center cursor-pointer transition-all ${
-              selectedFile
-                ? 'border-accent/40 bg-accent/5'
-                : 'border-border hover:border-accent/30 bg-bg-elevated/50 hover:bg-bg-elevated'
-            }`}
-          >
-            <input
-              ref={fileInputRef}
-              type="file"
-              onChange={(e) => e.target.files?.[0] && handleFileChange(e.target.files[0])}
-              accept=".pdf,.txt,.md,.png,.jpg,.jpeg,.doc,.docx"
-              className="hidden"
-            />
+          {/* Missing API Key Warning */}
+          {!hasApiKey && (
+            <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+                <span>
+                  <strong>Tip:</strong> Gemini API Key is not configured. Visual OCR reading from screenshots requires an API key in Settings to be searchable.
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => navigate('/settings')}
+                className="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 text-xs font-medium border border-amber-500/30 transition-all shrink-0"
+              >
+                Go to Settings
+              </button>
+            </div>
+          )}
 
-            {selectedFile ? (
-              <div className="flex flex-col items-center gap-3">
-                {previewUrl ? (
-                  <div className="relative w-32 h-32 rounded-xl overflow-hidden border border-border shadow-md">
-                    <img src={previewUrl} alt="Upload preview" className="w-full h-full object-cover" />
+          {/* Multi-file Batch Queue Mode */}
+          {batchQueue.length > 0 ? (
+            <div className="flex flex-col gap-4">
+              <div className="p-5 rounded-2xl bg-bg-elevated border border-border flex flex-col gap-3">
+                <div className="flex items-center justify-between border-b border-border pb-3">
+                  <div className="flex items-center gap-2">
+                    <UploadCloud className="w-4 h-4 text-accent" />
+                    <h2 className="text-xs font-bold text-text-primary font-mono uppercase tracking-wider">
+                      Batch Upload Queue ({batchQueue.length} Files)
+                    </h2>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setBatchQueue([])}
+                    disabled={isBatchProcessing}
+                    className="text-xs text-text-muted hover:text-text-primary"
+                  >
+                    Clear Queue
+                  </button>
+                </div>
+
+                <div className="flex flex-col gap-2 max-h-80 overflow-y-auto pr-1">
+                  {batchQueue.map((item, idx) => (
+                    <div
+                      key={item.id}
+                      className="p-3 rounded-xl bg-bg-base border border-border/80 flex items-center justify-between text-xs"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-8 h-8 rounded-lg bg-accent/10 border border-accent/20 flex items-center justify-center shrink-0">
+                          {item.file.type.startsWith('image/') ? (
+                            <Sparkles className="w-4 h-4 text-accent" />
+                          ) : (
+                            <FileText className="w-4 h-4 text-text-secondary" />
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-semibold text-text-primary truncate max-w-xs">{item.file.name}</p>
+                          <p className="font-mono text-[10px] text-text-muted">
+                            {Math.round(item.file.size / 1024)} KB · {item.file.type.startsWith('image/') ? 'Image / Screenshot' : 'Document'}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        {item.status === 'pending' && (
+                          <span className="font-mono text-[10px] px-2 py-0.5 rounded bg-bg-elevated border border-border text-text-muted">
+                            Queued
+                          </span>
+                        )}
+                        {item.status === 'extracting' && (
+                          <span className="font-mono text-[10px] px-2 py-0.5 rounded bg-accent/10 border border-accent/30 text-accent flex items-center gap-1">
+                            <Activity className="w-3 h-3 animate-spin" />
+                            AI OCR...
+                          </span>
+                        )}
+                        {item.status === 'uploading' && (
+                          <span className="font-mono text-[10px] px-2 py-0.5 rounded bg-blue-500/10 border border-blue-500/30 text-blue-400 flex items-center gap-1">
+                            <Activity className="w-3 h-3 animate-spin" />
+                            Indexing...
+                          </span>
+                        )}
+                        {item.status === 'done' && (
+                          <span className="font-mono text-[10px] px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center gap-1">
+                            <Check className="w-3 h-3" />
+                            Ready
+                          </span>
+                        )}
+                        {item.status === 'failed' && (
+                          <span className="font-mono text-[10px] px-2 py-0.5 rounded bg-red-500/10 border border-red-500/30 text-red-400">
+                            Failed
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex justify-end gap-3 pt-3 border-t border-border">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isBatchProcessing}
+                    className="px-4 py-2 rounded-xl border border-border text-xs text-text-secondary hover:text-text-primary"
+                  >
+                    Add More Files
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleBatchUpload}
+                    disabled={isBatchProcessing}
+                    className="px-6 py-2 rounded-xl bg-accent text-white text-xs font-medium hover:brightness-110 active:scale-95 disabled:opacity-40 transition-all flex items-center gap-2 shadow-[0_0_14px_rgba(239,68,68,0.25)]"
+                  >
+                    {isBatchProcessing ? (
+                      <>
+                        <Activity className="w-3.5 h-3.5 animate-spin" />
+                        <span>Processing {batchIndex + 1} of {batchQueue.length}...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Upload &amp; Index All ({batchQueue.length})</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Drag and drop zone */}
+              <div
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={handleDrop}
+                onClick={() => fileInputRef.current?.click()}
+                className={`border-2 border-dashed rounded-2xl p-8 flex flex-col items-center justify-center text-center cursor-pointer transition-all ${
+                  selectedFile
+                    ? 'border-accent/40 bg-accent/5'
+                    : 'border-border hover:border-accent/30 bg-bg-elevated/50 hover:bg-bg-elevated'
+                }`}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  onChange={(e) => e.target.files && handleFilesSelected(e.target.files)}
+                  accept=".pdf,.txt,.md,.png,.jpg,.jpeg,.webp,.doc,.docx"
+                  className="hidden"
+                />
+
+                {selectedFile ? (
+                  <div className="flex flex-col items-center gap-3">
+                    {previewUrl ? (
+                      <div className="relative w-32 h-32 rounded-xl overflow-hidden border border-border shadow-md">
+                        <img src={previewUrl} alt="Upload preview" className="w-full h-full object-cover" />
+                      </div>
+                    ) : (
+                      <div className="w-12 h-12 rounded-xl bg-accent-soft border border-accent/30 flex items-center justify-center text-accent">
+                        <FileText className="w-6 h-6" />
+                      </div>
+                    )}
+                    <div>
+                      <h3 className="text-xs font-semibold text-text-primary">{selectedFile.name}</h3>
+                      <p className="font-mono text-[10px] text-text-muted mt-0.5">
+                        {Math.round(selectedFile.size / 1024)} KB · Click or drag to replace
+                      </p>
+                    </div>
+                    {visionExtracting && (
+                      <div className="flex items-center gap-1.5 text-xs text-accent font-mono animate-pulse">
+                        <Activity className="w-3.5 h-3.5 animate-spin" />
+                        <span>Gemini Vision reading and transcribing visual text...</span>
+                      </div>
+                    )}
                   </div>
                 ) : (
-                  <div className="w-12 h-12 rounded-xl bg-accent-soft border border-accent/30 flex items-center justify-center text-accent">
-                    <FileText className="w-6 h-6" />
-                  </div>
-                )}
-                <div>
-                  <h3 className="text-xs font-semibold text-text-primary">{selectedFile.name}</h3>
-                  <p className="font-mono text-[10px] text-text-muted mt-0.5">
-                    {Math.round(selectedFile.size / 1024)} KB · Click or drag to replace
-                  </p>
-                </div>
-                {visionExtracting && (
-                  <div className="flex items-center gap-1.5 text-xs text-accent font-mono animate-pulse">
-                    <Activity className="w-3.5 h-3.5 animate-spin" />
-                    <span>Gemini Vision reading and transcribing content...</span>
+                  <div className="flex flex-col items-center gap-3 max-w-sm">
+                    <div className="w-12 h-12 rounded-2xl bg-accent-soft border border-accent/20 flex items-center justify-center text-accent shadow-glow">
+                      <UploadCloud className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-text-primary">Choose files or drag &amp; drop here</h3>
+                      <p className="text-xs text-text-secondary mt-1">
+                        Select one or multiple Screenshots (PNG, JPG), PDF, DOCX, or Text files.
+                      </p>
+                    </div>
                   </div>
                 )}
               </div>
-            ) : (
-              <div className="flex flex-col items-center gap-3 max-w-sm">
-                <div className="w-12 h-12 rounded-2xl bg-accent-soft border border-accent/20 flex items-center justify-center text-accent shadow-glow">
-                  <UploadCloud className="w-6 h-6" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-text-primary">Choose file or drag &amp; drop here</h3>
-                  <p className="text-xs text-text-secondary mt-1">
-                    PDF, DOCX, TXT, or Screenshots (PNG, JPG). Max 20 MB.
+
+              {/* Vision Extracted Text preview if available */}
+              {visionExtractedText && (
+                <div className="p-4 rounded-xl bg-bg-elevated border border-border flex flex-col gap-2">
+                  <div className="flex items-center justify-between text-xs font-semibold text-text-primary">
+                    <span className="flex items-center gap-1.5 text-accent">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      Transcribed by Gemini Vision:
+                    </span>
+                    <span className="font-mono text-[10px] text-text-muted">Indexed for Search</span>
+                  </div>
+                  <p className="text-xs text-text-secondary leading-relaxed bg-bg-base p-3 rounded-lg font-mono max-h-36 overflow-y-auto whitespace-pre-wrap">
+                    {visionExtractedText}
                   </p>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
 
-          {/* Vision Extracted Text preview if available */}
-          {visionExtractedText && (
-            <div className="p-4 rounded-xl bg-bg-elevated border border-border flex flex-col gap-2">
-              <div className="flex items-center justify-between text-xs font-semibold text-text-primary">
-                <span className="flex items-center gap-1.5 text-accent">
-                  <Sparkles className="w-3.5 h-3.5" />
-                  Transcribed by Gemini Vision:
-                </span>
-                <span className="font-mono text-[10px] text-text-muted">Indexed for Search</span>
-              </div>
-              <p className="text-xs text-text-secondary leading-relaxed bg-bg-base p-3 rounded-lg font-mono max-h-36 overflow-y-auto whitespace-pre-wrap">
-                {visionExtractedText}
-              </p>
-            </div>
-          )}
+              {/* Form Fields */}
+              <div className="p-6 rounded-2xl bg-bg-elevated border border-border flex flex-col gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-medium text-text-secondary block mb-1">Title</label>
+                    <input
+                      type="text"
+                      value={fileTitle}
+                      onChange={(e) => setFileTitle(e.target.value)}
+                      placeholder="e.g. DBMS Exam Schedule"
+                      className="w-full bg-bg-base border border-border rounded-xl px-3.5 py-2.5 text-xs text-text-primary focus:outline-none focus:border-accent"
+                    />
+                  </div>
 
-          {/* Form Fields */}
-          <div className="p-6 rounded-2xl bg-bg-elevated border border-border flex flex-col gap-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs font-medium text-text-secondary block mb-1">Title</label>
-                <input
-                  type="text"
-                  value={fileTitle}
-                  onChange={(e) => setFileTitle(e.target.value)}
-                  placeholder="e.g. DBMS Exam Schedule"
-                  className="w-full bg-bg-base border border-border rounded-xl px-3.5 py-2.5 text-xs text-text-primary focus:outline-none focus:border-accent"
-                />
-              </div>
+                  <div>
+                    <label className="text-xs font-medium text-text-secondary block mb-1">Category</label>
+                    <select
+                      value={fileCategory}
+                      onChange={(e) => setFileCategory(e.target.value)}
+                      className="w-full bg-bg-base border border-border rounded-xl px-3.5 py-2.5 text-xs text-text-primary focus:outline-none focus:border-accent"
+                    >
+                      {CATEGORIES.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
 
-              <div>
-                <label className="text-xs font-medium text-text-secondary block mb-1">Category</label>
-                <select
-                  value={fileCategory}
-                  onChange={(e) => setFileCategory(e.target.value)}
-                  className="w-full bg-bg-base border border-border rounded-xl px-3.5 py-2.5 text-xs text-text-primary focus:outline-none focus:border-accent"
-                >
-                  {CATEGORIES.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Tags Input */}
-            <div>
-              <label className="text-xs font-medium text-text-secondary block mb-1">Tags</label>
-              <div className="flex flex-wrap items-center gap-1.5 mb-2">
-                {fileTags.map((t) => (
-                  <span
-                    key={t}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-bg-base border border-border text-[11px] font-mono text-text-secondary"
-                  >
-                    #{t}
+                {/* Tags Input */}
+                <div>
+                  <label className="text-xs font-medium text-text-secondary block mb-1">Tags</label>
+                  <div className="flex flex-wrap items-center gap-1.5 mb-2">
+                    {fileTags.map((t) => (
+                      <span
+                        key={t}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-bg-base border border-border text-[11px] font-mono text-text-secondary"
+                      >
+                        #{t}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveTag(t, false)}
+                          className="hover:text-red-400"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={tagInput}
+                      onChange={(e) => setTagInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddTag(false);
+                        }
+                      }}
+                      placeholder="Add a tag and press Enter"
+                      className="flex-1 bg-bg-base border border-border rounded-xl px-3.5 py-2 text-xs text-text-primary focus:outline-none focus:border-accent"
+                    />
                     <button
                       type="button"
-                      onClick={() => handleRemoveTag(t, false)}
-                      className="hover:text-red-400"
+                      onClick={() => handleAddTag(false)}
+                      className="px-3 py-2 rounded-xl bg-bg-base border border-border hover:bg-bg-hover text-xs text-text-secondary hover:text-text-primary"
                     >
-                      <X className="w-3 h-3" />
+                      Add
                     </button>
-                  </span>
-                ))}
+                  </div>
+                </div>
               </div>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={tagInput}
-                  onChange={(e) => setTagInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleAddTag(false);
-                    }
-                  }}
-                  placeholder="Add a tag and press Enter"
-                  className="flex-1 bg-bg-base border border-border rounded-xl px-3.5 py-2 text-xs text-text-primary focus:outline-none focus:border-accent"
-                />
+
+              {/* Progress Bar during upload */}
+              {uploadStatus !== 'idle' && (
+                <div className="p-4 rounded-xl bg-bg-elevated border border-border flex flex-col gap-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-mono text-text-primary flex items-center gap-2">
+                      <Activity className="w-3.5 h-3.5 text-accent animate-spin" />
+                      {uploadStatus === 'uploading' && 'Uploading file to personal store...'}
+                      {uploadStatus === 'processing' && 'Indexing into Gemini Retrieval Store...'}
+                      {uploadStatus === 'ready' && 'Indexing complete! Ready to retrieve.'}
+                    </span>
+                    <span className="font-mono text-text-muted">{uploadProgress}%</span>
+                  </div>
+                  <div className="w-full h-1.5 bg-bg-base rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-accent transition-all duration-300"
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Submit Button */}
+              <div className="flex justify-end">
                 <button
-                  type="button"
-                  onClick={() => handleAddTag(false)}
-                  className="px-3 py-2 rounded-xl bg-bg-base border border-border hover:bg-bg-hover text-xs text-text-secondary hover:text-text-primary"
+                  type="submit"
+                  disabled={!selectedFile || uploadStatus === 'uploading' || uploadStatus === 'processing'}
+                  className="px-6 py-3 rounded-xl bg-accent text-white text-xs font-medium hover:brightness-110 active:scale-95 disabled:opacity-40 transition-all shadow-[0_0_16px_rgba(239,68,68,0.25)] flex items-center gap-2"
                 >
-                  Add
+                  <span>{uploadStatus === 'processing' ? 'Indexing Memory...' : 'Index Memory'}</span>
+                  <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
-            </div>
-          </div>
-
-          {/* Progress Bar during upload */}
-          {uploadStatus !== 'idle' && (
-            <div className="p-4 rounded-xl bg-bg-elevated border border-border flex flex-col gap-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-mono text-text-primary flex items-center gap-2">
-                  <Activity className="w-3.5 h-3.5 text-accent animate-spin" />
-                  {uploadStatus === 'uploading' && 'Uploading file to personal store...'}
-                  {uploadStatus === 'processing' && 'Indexing into Gemini Retrieval Store...'}
-                  {uploadStatus === 'ready' && 'Indexing complete! Ready to retrieve.'}
-                </span>
-                <span className="font-mono text-text-muted">{uploadProgress}%</span>
-              </div>
-              <div className="w-full h-1.5 bg-bg-base rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-accent transition-all duration-300"
-                  style={{ width: `${uploadProgress}%` }}
-                />
-              </div>
-            </div>
+            </>
           )}
-
-          {/* Submit Button */}
-          <div className="flex justify-end">
-            <button
-              type="submit"
-              disabled={!selectedFile || uploadStatus === 'uploading' || uploadStatus === 'processing'}
-              className="px-6 py-3 rounded-xl bg-accent text-white text-xs font-medium hover:brightness-110 active:scale-95 disabled:opacity-40 transition-all shadow-[0_0_16px_rgba(239,68,68,0.25)] flex items-center gap-2"
-            >
-              <span>{uploadStatus === 'processing' ? 'Indexing Memory...' : 'Index Memory'}</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
         </form>
       )}
 

@@ -189,7 +189,8 @@ export const api = {
     file: File,
     title?: string,
     category = 'General',
-    tags: string[] = []
+    tags: string[] = [],
+    extractedContent?: string
   ): Promise<Memory> {
     // Check 5 GB storage cap
     const currentStats = await this.getStats();
@@ -207,6 +208,7 @@ export const api = {
 
     let content = `Uploaded file: ${file.name}`;
     let storagePath: string | undefined = undefined;
+    let indexingStatus: 'ready' | 'processing' | 'failed' = 'ready';
 
     // Handle file preview and Gemini vision/text extraction
     if (isImage) {
@@ -218,11 +220,20 @@ export const api = {
       });
       storagePath = dataUrl;
 
-      if (geminiService.hasApiKey()) {
+      if (extractedContent && extractedContent.trim().length > 0) {
+        content = extractedContent.trim();
+        indexingStatus = 'ready';
+      } else if (geminiService.hasApiKey()) {
         try {
           const visionResult = await geminiService.extractTextFromImage(file);
           if (visionResult.extractedText) {
             content = visionResult.extractedText;
+            if (!title && visionResult.title) title = visionResult.title;
+            if (visionResult.category && category === 'General') category = visionResult.category;
+            if (visionResult.tags && visionResult.tags.length > 0 && tags.length === 0) {
+              tags = visionResult.tags;
+            }
+            indexingStatus = 'ready';
           }
         } catch (e) {
           console.warn('Vision extraction skipped:', e);
@@ -244,6 +255,11 @@ export const api = {
         content = `Document: ${file.name}`;
       }
     }
+
+    const finalTitle = title || file.name.replace(/\.[^/.]+$/, '');
+    const finalDescription = isImage && content.length > 30 && !content.startsWith('Image uploaded:')
+      ? `Visual OCR: ${content.slice(0, 160).replace(/\s+/g, ' ')}...`
+      : `Uploaded ${file.name} (${Math.round(file.size / 1024)} KB)`;
 
     // Direct Supabase PostgreSQL & Storage Insertion
     if (isSupabaseConfigured() && client) {
@@ -272,8 +288,8 @@ export const api = {
 
           const memoryRecord: Partial<Memory> = {
             user_id: user.id,
-            title: title || file.name.replace(/\.[^/.]+$/, ''),
-            description: `Uploaded ${file.name} (${Math.round(file.size / 1024)} KB)`,
+            title: finalTitle,
+            description: finalDescription,
             type: memoryType,
             category,
             tags,
@@ -281,7 +297,7 @@ export const api = {
             original_file_name: originalFileName,
             mime_type: mimeType,
             file_size: file.size,
-            indexing_status: 'ready',
+            indexing_status: indexingStatus,
             is_favorite: false,
             content,
           };
@@ -307,8 +323,8 @@ export const api = {
     const newMemory: Memory = {
       id: 'mem-' + Date.now(),
       user_id: 'current-user',
-      title: title || file.name.replace(/\.[^/.]+$/, ''),
-      description: `Uploaded ${file.name} (${Math.round(file.size / 1024)} KB)`,
+      title: finalTitle,
+      description: finalDescription,
       type: memoryType,
       category,
       tags,
@@ -316,7 +332,7 @@ export const api = {
       original_file_name: originalFileName,
       mime_type: mimeType,
       file_size: file.size,
-      indexing_status: 'ready',
+      indexing_status: indexingStatus,
       is_favorite: false,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -419,7 +435,7 @@ export const api = {
 
   async updateMemory(
     id: string,
-    updates: Partial<Pick<Memory, 'title' | 'description' | 'category' | 'tags' | 'content' | 'is_favorite'>>
+    updates: Partial<Pick<Memory, 'title' | 'description' | 'category' | 'tags' | 'content' | 'is_favorite' | 'indexing_status'>>
   ): Promise<Memory | null> {
     const client = getSupabaseClient();
     if (isSupabaseConfigured() && client) {
@@ -456,6 +472,72 @@ export const api = {
     return current[idx];
   },
 
+  /**
+   * Transcribe a single image memory on-demand using Gemini Vision and persist result.
+   */
+  async transcribeImageMemory(memoryId: string): Promise<Memory> {
+    const mem = await this.getMemory(memoryId);
+    if (!mem) throw new Error('Memory not found');
+    if (mem.type !== 'image') throw new Error('Memory is not an image');
+    if (!geminiService.hasApiKey()) {
+      throw new Error('Gemini API Key is not configured. Please enter your API key in Settings.');
+    }
+
+    let imageUrl = mem.storage_path;
+    if (imageUrl && !imageUrl.startsWith('data:') && !imageUrl.startsWith('http')) {
+      const signed = await this.getFileUrl(imageUrl);
+      if (signed) imageUrl = signed;
+    }
+
+    if (!imageUrl) {
+      throw new Error('Image data not found for transcription');
+    }
+
+    const visionResult = await geminiService.extractTextFromImage(imageUrl);
+    const updates: Partial<Memory> = {
+      content: visionResult.extractedText || mem.content,
+      title: mem.title.startsWith('Screenshot') || mem.title === 'Untitled' || !mem.title ? (visionResult.title || mem.title) : mem.title,
+      category: mem.category === 'General' && visionResult.category ? visionResult.category : mem.category,
+      tags: Array.from(new Set([...(mem.tags || []), ...(visionResult.tags || [])])),
+      description: visionResult.extractedText
+        ? `Visual OCR: ${visionResult.extractedText.slice(0, 160).replace(/\s+/g, ' ')}...`
+        : mem.description,
+      indexing_status: 'ready',
+    };
+
+    const updated = await this.updateMemory(memoryId, updates);
+    return updated || mem;
+  },
+
+  /**
+   * Batch transcribe all image memories that have missing or placeholder content.
+   */
+  async transcribeAllPendingImages(): Promise<{ count: number; failed: number }> {
+    if (!geminiService.hasApiKey()) {
+      throw new Error('Gemini API Key is not configured. Please add your key in Settings.');
+    }
+
+    const memories = await this.listMemories();
+    const pendingImages = memories.filter(
+      (m) => m.type === 'image' && (!m.content || m.content.startsWith('Image uploaded:') || m.content.startsWith('Uploaded file:') || m.content.length < 50)
+    );
+
+    let count = 0;
+    let failed = 0;
+
+    for (const mem of pendingImages) {
+      try {
+        await this.transcribeImageMemory(mem.id);
+        count++;
+      } catch (err) {
+        console.warn(`Failed to transcribe memory ${mem.id}:`, err);
+        failed++;
+      }
+    }
+
+    return { count, failed };
+  },
+
   async askMemory(question: string, _conversationId?: string): Promise<AskResponse> {
     // 1. Fetch available memories (either from Supabase or Local)
     let memories: Memory[] = [];
@@ -487,6 +569,46 @@ export const api = {
     // 2. If Gemini API key is configured, execute live Gemini grounded RAG
     if (geminiService.hasApiKey()) {
       try {
+        // Auto-transcribe any unindexed screenshots on-the-fly (up to 12 items)
+        const pendingImages = memories.filter(
+          (m) => m.type === 'image' && m.storage_path && (!m.content || m.content.startsWith('Image uploaded:') || m.content.startsWith('Uploaded file:') || m.content.length < 50)
+        );
+
+        if (pendingImages.length > 0 && pendingImages.length <= 15) {
+          await Promise.allSettled(
+            pendingImages.map(async (pim) => {
+              try {
+                let imgPath = pim.storage_path!;
+                if (!imgPath.startsWith('data:') && !imgPath.startsWith('http')) {
+                  const signed = await this.getFileUrl(imgPath);
+                  if (signed) imgPath = signed;
+                }
+                const res = await geminiService.extractTextFromImage(imgPath);
+                if (res.extractedText) {
+                  pim.content = res.extractedText;
+                  if (pim.title.startsWith('Screenshot') || pim.title === 'Untitled' || !pim.title) {
+                    pim.title = res.title || pim.title;
+                  }
+                  if (res.tags && res.tags.length > 0) {
+                    pim.tags = Array.from(new Set([...(pim.tags || []), ...res.tags]));
+                  }
+                  pim.description = `Visual OCR: ${res.extractedText.slice(0, 160).replace(/\s+/g, ' ')}...`;
+                  pim.indexing_status = 'ready';
+                  await this.updateMemory(pim.id, {
+                    content: pim.content,
+                    title: pim.title,
+                    tags: pim.tags,
+                    description: pim.description,
+                    indexing_status: 'ready',
+                  });
+                }
+              } catch (e) {
+                console.warn('Auto-transcribe skipped during ask for', pim.id, e);
+              }
+            })
+          );
+        }
+
         const geminiRes = await geminiService.askMemoryWithGemini(question, memories);
         return geminiRes;
       } catch (err: any) {
@@ -506,8 +628,10 @@ export const api = {
       };
     }
 
-    // Benchmark test queries (Only executed for offline/demo users to prevent leaking synthetic demo data)
-    if (!isSupabaseUser) {
+    // Benchmark test queries ONLY when user has pure demo memories and no custom uploads
+    const isPureDemoData = memories.length > 0 && memories.every((m) => m.id.startsWith('demo-mem-'));
+
+    if (isPureDemoData) {
       // 1. DBMS Exam query
       if (qLower.includes('dbms') || (qLower.includes('exam') && !qLower.includes('hostel'))) {
         const mem = memories.find((m) => m.original_file_name?.includes('exam_schedule') || m.content?.includes('DBMS examination'));
@@ -651,10 +775,10 @@ export const api = {
       }
     }
 
-    // 7. General search across memories content & title
+    // 4. General search across memories content & title
     const searchTerms = qLower
       .split(/\s+/)
-      .filter((w) => w.length > 2 && !['what', 'when', 'where', 'which', 'does', 'have', 'from', 'with', 'about', 'this', 'that', 'tell'].includes(w));
+      .filter((w) => w.length > 2 && !['what', 'when', 'where', 'which', 'does', 'have', 'from', 'with', 'about', 'this', 'that', 'tell', 'show', 'give'].includes(w));
 
     if (searchTerms.length > 0) {
       let bestMem: Memory | null = null;
@@ -694,9 +818,12 @@ export const api = {
       }
     }
 
-    // Exact not-found response
+    // Honest not-found response with clear guidance
+    const hasImageMemories = memories.some((m) => m.type === 'image');
     return {
-      answer: "I couldn't find this information in your memories.",
+      answer: hasImageMemories && !geminiService.hasApiKey()
+        ? "I couldn't find matching information in your memories. Tip: If you're asking about your uploaded screenshots, please configure your Gemini API Key in Settings so that Memory AI can visually transcribe and search the data inside your screenshots!"
+        : "I couldn't find this information in your memories.",
       sources: [],
       foundInformation: false,
       conflictDetected: false,
