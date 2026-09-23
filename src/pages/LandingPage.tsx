@@ -1,5 +1,6 @@
-import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { Header } from '../components/common/Header';
 import {
   UploadCloud,
@@ -9,7 +10,6 @@ import {
   FileCheck2,
   ArrowRight,
   Shield,
-  FileText,
   Image as ImageIcon,
   Sparkles,
   Zap,
@@ -18,7 +18,31 @@ import {
 } from 'lucide-react';
 
 export const LandingPage: React.FC = () => {
+  const { user, isLoading, enableDemoUser } = useAuth();
   const navigate = useNavigate();
+
+  // If user is already authenticated, redirect directly to /dashboard
+  useEffect(() => {
+    if (!isLoading && user) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [user, isLoading, navigate]);
+
+  const handleStartBuilding = () => {
+    if (user) {
+      navigate('/dashboard');
+    } else {
+      navigate('/login?signup=true');
+    }
+  };
+
+  const handleExploreDemo = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!user) {
+      enableDemoUser();
+    }
+    navigate('/ask');
+  };
 
   return (
     <div className="min-h-screen bg-bg-base text-text-primary flex flex-col font-sans selection:bg-accent-soft selection:text-text-primary">
@@ -54,20 +78,20 @@ export const LandingPage: React.FC = () => {
           {/* CTA Buttons Row */}
           <div className="flex flex-col sm:flex-row items-center gap-4 mb-16">
             <button
-              onClick={() => navigate('/login?signup=true')}
-              className="w-full sm:w-auto font-medium text-sm text-white bg-accent hover:brightness-110 active:scale-[0.98] px-7 py-3.5 rounded-xl transition-all shadow-[0_0_24px_rgba(239,68,68,0.3)] flex items-center justify-center gap-2"
+              onClick={handleStartBuilding}
+              className="w-full sm:w-auto font-medium text-sm text-white bg-accent hover:brightness-110 active:scale-[0.98] px-7 py-3.5 rounded-xl transition-all shadow-[0_0_24px_rgba(239,68,68,0.3)] flex items-center justify-center gap-2 cursor-pointer"
             >
               <Sparkles className="w-4 h-4" />
-              <span>Start Building My Memory</span>
+              <span>{user ? 'Go to Dashboard' : 'Start Building My Memory'}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
-            <Link
-              to="/ask"
-              className="w-full sm:w-auto font-medium text-sm text-text-primary bg-bg-elevated hover:bg-bg-hover px-7 py-3.5 rounded-xl border border-border transition-all flex items-center justify-center gap-2"
+            <button
+              onClick={handleExploreDemo}
+              className="w-full sm:w-auto font-medium text-sm text-text-primary bg-bg-elevated hover:bg-bg-hover px-7 py-3.5 rounded-xl border border-border transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
               <Search className="w-4 h-4 text-text-secondary" />
               <span>Explore Interactive Demo</span>
-            </Link>
+            </button>
           </div>
 
           {/* The Core Pipeline Visualization (The Architectural Truth) */}

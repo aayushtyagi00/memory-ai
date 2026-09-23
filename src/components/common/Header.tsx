@@ -12,7 +12,7 @@ export const Header: React.FC = () => {
       <div className="h-16 max-w-[1200px] mx-auto px-4 md:px-8 flex items-center justify-between">
         {/* Brand */}
         <div className="flex items-center gap-8">
-          <Link to="/" className="flex items-center gap-3 transition-opacity hover:opacity-90">
+          <Link to={user ? "/dashboard" : "/"} className="flex items-center gap-3 transition-opacity hover:opacity-90">
             <div className="w-8 h-8 rounded-lg bg-bg-elevated border border-border flex items-center justify-center text-accent">
               <span className="material-symbols-outlined text-[20px] text-accent">memory</span>
             </div>
@@ -28,7 +28,7 @@ export const Header: React.FC = () => {
             <a href="#features" className="text-text-muted hover:text-text-primary transition-colors">
               Features
             </a>
-            <Link to="/memories" className="text-text-muted hover:text-text-primary transition-colors">
+            <Link to={user ? "/memories" : "/login"} className="text-text-muted hover:text-text-primary transition-colors">
               Library
             </Link>
           </nav>

@@ -1,5 +1,5 @@
-import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { AppLayout } from './components/layout/AppLayout';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
@@ -14,6 +14,24 @@ import { TimelinePage } from './pages/TimelinePage';
 import { RemindersPage } from './pages/RemindersPage';
 import { SettingsPage } from './pages/SettingsPage';
 
+// Automatically redirects authenticated users away from public landing/login pages to /dashboard
+const AuthRedirectWatcher: React.FC = () => {
+  const { user, isLoading } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!isLoading && user) {
+      if (location.pathname === '/' || location.pathname === '/login') {
+        navigate('/dashboard', { replace: true });
+      }
+    }
+  }, [user, isLoading, location.pathname, navigate]);
+
+  return null;
+};
+
+// Route wrapper for authenticated users only
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, isLoading } = useAuth();
 
@@ -32,17 +50,51 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
   return <>{children}</>;
 };
 
+// Route wrapper for public/guest pages - if already authenticated, redirects directly to /dashboard
+const PublicOnlyRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-bg-base flex items-center justify-center font-mono text-xs text-text-muted">
+        Loading personal memory...
+      </div>
+    );
+  }
+
+  if (user) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <>{children}</>;
+};
+
 export const App: React.FC = () => {
   return (
     <ErrorBoundary>
       <AuthProvider>
         <BrowserRouter>
+          <AuthRedirectWatcher />
           <Routes>
-            {/* Public Routes */}
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/login" element={<AuthPage />} />
+            {/* Public Routes: authenticated users are directly sent to /dashboard */}
+            <Route
+              path="/"
+              element={
+                <PublicOnlyRoute>
+                  <LandingPage />
+                </PublicOnlyRoute>
+              }
+            />
+            <Route
+              path="/login"
+              element={
+                <PublicOnlyRoute>
+                  <AuthPage />
+                </PublicOnlyRoute>
+              }
+            />
 
-            {/* Authenticated Routes wrapped in AppLayout */}
+            {/* Authenticated Main App Routes wrapped in AppLayout */}
             <Route
               element={
                 <ProtectedRoute>

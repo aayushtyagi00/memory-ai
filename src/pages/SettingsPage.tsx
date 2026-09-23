@@ -102,7 +102,7 @@ export const SettingsPage: React.FC = () => {
 
   const handleSignOut = async () => {
     await signOut();
-    navigate('/login');
+    navigate('/', { replace: true });
   };
 
   const handleDeleteAll = async () => {
@@ -112,8 +112,8 @@ export const SettingsPage: React.FC = () => {
   };
 
   const hasConfiguredGemini = Boolean(geminiService.getApiKey());
-  const authProvider = user?.app_metadata?.provider || (user?.email?.endsWith('@gmail.com') ? 'Google' : 'Supabase Auth');
-  const userDisplayName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User';
+  const authProvider = user ? (user?.app_metadata?.provider || (user?.email?.endsWith('@gmail.com') ? 'Google' : 'Supabase Auth')) : 'Guest Mode';
+  const userDisplayName = user ? (user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User') : 'Guest User';
 
   const storageUsed = stats.storageBytes || 0;
   const storageCap = stats.storageLimitBytes || USER_STORAGE_CAP_BYTES;

@@ -123,7 +123,7 @@ export const AppLayout: React.FC = () => {
             <button
               onClick={async () => {
                 await signOut();
-                navigate('/login', { replace: true });
+                navigate('/', { replace: true });
               }}
               title="Sign Out"
               className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-hover transition-colors"
