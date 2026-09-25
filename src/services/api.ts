@@ -958,7 +958,8 @@ export const api = {
 
   async deleteMemory(memoryId: string): Promise<void> {
     const client = getSupabaseClient();
-    if (isSupabaseConfigured() && client) {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(memoryId);
+    if (isSupabaseConfigured() && client && isUuid) {
       try {
         // Retrieve storage path before deletion to remove physical file from private bucket
         const { data: mem } = await client
@@ -996,7 +997,8 @@ export const api = {
     saveLocalMemories(current);
 
     const client = getSupabaseClient();
-    if (isSupabaseConfigured() && client) {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(memoryId);
+    if (isSupabaseConfigured() && client && isUuid) {
       try {
         await client.from('memories').update({ is_favorite: target.is_favorite }).eq('id', memoryId);
       } catch (err) {
@@ -1029,6 +1031,40 @@ export const api = {
     source_memory_id?: string
   ): Promise<Reminder> {
     const client = getSupabaseClient();
+    const isSourceMemUuid = Boolean(source_memory_id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(source_memory_id));
+
+    if (isSupabaseConfigured() && client) {
+      try {
+        const { data: userData } = await client.auth.getUser();
+        const user = userData?.user;
+        if (user) {
+          const { data, error } = await client
+            .from('reminders')
+            .insert({
+              user_id: user.id,
+              title,
+              description: description || null,
+              due_at: due_at || null,
+              source_memory_id: isSourceMemUuid ? source_memory_id : null,
+              status: 'pending',
+            })
+            .select()
+            .single();
+          if (!error && data) {
+            const currentRems = getLocalReminders();
+            currentRems.unshift(data as Reminder);
+            saveLocalReminders(currentRems);
+            return data as Reminder;
+          }
+          if (error) {
+            console.warn('Supabase createReminder notice:', error.message);
+          }
+        }
+      } catch (err) {
+        console.warn('Supabase createReminder error:', err);
+      }
+    }
+
     const newRem: Reminder = {
       id: 'rem-' + Date.now(),
       user_id: 'current-user',
@@ -1039,23 +1075,6 @@ export const api = {
       status: 'pending',
       created_at: new Date().toISOString(),
     };
-
-    if (isSupabaseConfigured() && client) {
-      try {
-        const { data: userData } = await client.auth.getUser();
-        const user = userData?.user;
-        if (user) {
-          const { data, error } = await client
-            .from('reminders')
-            .insert({ ...newRem, user_id: user.id })
-            .select()
-            .single();
-          if (!error && data) return data as Reminder;
-        }
-      } catch (err) {
-        console.warn('Supabase createReminder error:', err);
-      }
-    }
 
     const rems = getLocalReminders();
     rems.unshift(newRem);
@@ -1071,7 +1090,8 @@ export const api = {
     saveLocalReminders(rems);
 
     const client = getSupabaseClient();
-    if (isSupabaseConfigured() && client) {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(reminderId);
+    if (isSupabaseConfigured() && client && isUuid) {
       try {
         await client.from('reminders').update({ status: rem.status }).eq('id', reminderId);
       } catch (err) {
@@ -1086,7 +1106,8 @@ export const api = {
     saveLocalReminders(rems);
 
     const client = getSupabaseClient();
-    if (isSupabaseConfigured() && client) {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(reminderId);
+    if (isSupabaseConfigured() && client && isUuid) {
       try {
         await client.from('reminders').delete().eq('id', reminderId);
       } catch (err) {
@@ -1106,13 +1127,15 @@ export const api = {
         const { data: userData } = await client.auth.getUser();
         const user = userData?.user;
         if (user) {
-          // Bulk insert memories into Supabase for this user
-          const records = INITIAL_DEMO_MEMORIES.map((m) => ({
-            ...m,
-            user_id: user.id,
-            id: undefined, // allow postgres to generate uuid or keep
-          }));
-          await client.from('memories').upsert(records);
+          // Bulk insert memories into Supabase with clean auto-generated UUIDs
+          const records = INITIAL_DEMO_MEMORIES.map((m) => {
+            const { id: _id, ...rest } = m;
+            return {
+              ...rest,
+              user_id: user.id,
+            };
+          });
+          await client.from('memories').insert(records);
         }
       } catch (e) {
         console.warn('Supabase load demo data notice:', e);

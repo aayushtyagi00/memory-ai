@@ -107,6 +107,11 @@ begin
   return new;
 end $$;
 
+-- Secure SECURITY DEFINER trigger function against unauthorized API execution
+revoke all on function public.handle_new_user() from public;
+revoke all on function public.handle_new_user() from anon, authenticated;
+grant execute on function public.handle_new_user() to postgres, service_role, supabase_auth_admin;
+
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
@@ -127,7 +132,7 @@ create policy "own profile" on public.profiles for all using (auth.uid() = id) w
 
 -- Memory Stores: Own store
 drop policy if exists "own store" on public.memory_stores;
-create policy "own store" on public.memory_stores for select using (auth.uid() = user_id);
+create policy "own store" on public.memory_stores for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 -- Memories: Own memories
 drop policy if exists "own memories" on public.memories;
@@ -141,9 +146,25 @@ create policy "own notes" on public.notes for all using (auth.uid() = user_id) w
 drop policy if exists "own conversations" on public.conversations;
 create policy "own conversations" on public.conversations for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
--- Messages: Own messages
+-- Messages: Own messages (hardened with conversation ownership check)
 drop policy if exists "own messages" on public.messages;
-create policy "own messages" on public.messages for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "own messages" on public.messages for all
+using (
+  auth.uid() = user_id
+  and exists (
+    select 1 from public.conversations c
+    where c.id = messages.conversation_id
+    and c.user_id = auth.uid()
+  )
+)
+with check (
+  auth.uid() = user_id
+  and exists (
+    select 1 from public.conversations c
+    where c.id = messages.conversation_id
+    and c.user_id = auth.uid()
+  )
+);
 
 -- Reminders: Own reminders
 drop policy if exists "own reminders" on public.reminders;
@@ -167,8 +188,48 @@ on storage.objects for insert
 to authenticated
 with check (bucket_id = 'memory-files' and (storage.foldername(name))[1] = auth.uid()::text);
 
+drop policy if exists "Allow authenticated users to update their own files" on storage.objects;
+create policy "Allow authenticated users to update their own files"
+on storage.objects for update
+to authenticated
+using (bucket_id = 'memory-files' and (storage.foldername(name))[1] = auth.uid()::text)
+with check (bucket_id = 'memory-files' and (storage.foldername(name))[1] = auth.uid()::text);
+
 drop policy if exists "Allow authenticated users to delete their own files" on storage.objects;
 create policy "Allow authenticated users to delete their own files"
 on storage.objects for delete
 to authenticated
 using (bucket_id = 'memory-files' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- 10. AUTOMATIC updated_at TRIGGERS
+create or replace function public.handle_updated_at()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  new.updated_at = now();
+  return new;
+end $$;
+
+revoke all on function public.handle_updated_at() from public, anon, authenticated;
+grant execute on function public.handle_updated_at() to postgres, service_role;
+
+drop trigger if exists set_profiles_updated_at on public.profiles;
+create trigger set_profiles_updated_at before update on public.profiles for each row execute function public.handle_updated_at();
+
+drop trigger if exists set_memory_stores_updated_at on public.memory_stores;
+create trigger set_memory_stores_updated_at before update on public.memory_stores for each row execute function public.handle_updated_at();
+
+drop trigger if exists set_memories_updated_at on public.memories;
+create trigger set_memories_updated_at before update on public.memories for each row execute function public.handle_updated_at();
+
+drop trigger if exists set_notes_updated_at on public.notes;
+create trigger set_notes_updated_at before update on public.notes for each row execute function public.handle_updated_at();
+
+drop trigger if exists set_conversations_updated_at on public.conversations;
+create trigger set_conversations_updated_at before update on public.conversations for each row execute function public.handle_updated_at();
+
+-- 11. PERFORMANCE & SCALABILITY COMPOUND INDEXES
+create index if not exists idx_memories_user_created_at on public.memories(user_id, created_at desc);
+create index if not exists idx_memories_user_favorite on public.memories(user_id, is_favorite) where is_favorite = true;
+create index if not exists idx_memories_user_category on public.memories(user_id, category);
+create index if not exists idx_messages_conv_created_at on public.messages(conversation_id, created_at asc);
+create index if not exists idx_reminders_user_due_at on public.reminders(user_id, status, due_at asc);
