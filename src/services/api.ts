@@ -59,7 +59,7 @@ export const api={
     const image=mime.startsWith('image/');let content=extractedContent?.trim()||'';
     if(!content&&!image)content=await extractDocument(file);
     // Only scanned PDFs/images need AI. Text-bearing documents are parsed locally.
-    if(!content&&mode.kind==='demo'&&(image||mime==='application/pdf')&&geminiService.hasApiKey()){try{content=(await geminiService.extractTextFromImage(file)).extractedText;}catch{/* Preserve originals even when the provider is unavailable. */}}
+    if(!content&&(image||mime==='application/pdf')&&geminiService.hasApiKey()){try{content=(await geminiService.extractTextFromImage(file)).extractedText;}catch{/* Preserve originals even when the provider is unavailable. */}}
     const input={title:text(title||file.name.replace(/\.[^.]+$/,''),'Title',200),category:validCategory(category),tags:validTags(tags)};
     assertGeneration(generation);
     if(mode.kind==='cloud') {
@@ -95,11 +95,12 @@ export const api={
   async cleanGhostMemories():Promise<number>{throw new Error('Automatic deletion is disabled. Open a memory to retry extraction or explicitly delete it.');},
   async askMemory(question:string,conversationId?:string):Promise<AskResponse> {
     text(question,'Question',MAX_QUESTION_CHARS);
-    if(requireMode().kind==='cloud')return invoke<AskResponse>('ask-memory',{question,conversationId,model:geminiService.getModel()});
+    const generation=getGeneration();
     const history=conversationId?(await this.getConversation(conversationId))?.messages.slice(-8)||[]:[];
-    const all=(await memories()).filter(m=>m.indexing_status==='ready'&&m.content);
+    const all=(await this.listMemories()).filter(m=>m.indexing_status==='ready'&&m.content);
+    assertGeneration(generation);
     if(geminiService.hasApiKey())return geminiService.askMemoryWithGemini(question,all,history);
-    // Local demo search returns actual quoted excerpts, never synthetic answers or conflicts.
+    // Without a personal key, both cloud and demo return actual quoted excerpts.
     const terms=question.toLowerCase().match(/[\p{L}\p{N}]+/gu)?.filter(t=>t.length>2&&!['what','when','where','does','have','from','with','about','this','that','tell','show','give','the','and','are','for','how'].includes(t))||[];
     const results=all.flatMap(m=>chunks(m.content||'').map(content=>({memory:m,content,score:terms.reduce((sum,t)=>sum+(content.toLowerCase().includes(t)?1:0),0)}))).filter(x=>x.score>0).sort((a,b)=>b.score-a.score).slice(0,3);
     if(!results.length)return {answer:NOT_FOUND,sources:[],foundInformation:false,conflictDetected:false};

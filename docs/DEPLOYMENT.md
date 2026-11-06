@@ -6,7 +6,7 @@ Code changes do not update a hosted database or deploy functions automatically. 
 
 The existing frontend uses origin `https://memory-ai-two-eta.vercel.app` and the linked Supabase project reference is `iqdwixeogewcbxsdpioy`. A public check on 6 November 2026 found the frontend reachable, but all seven app-facing Edge Functions returned HTTP 404 (function not found). A database push does not deploy these functions.
 
-In Supabase **Edge Functions → Secrets**, set `GEMINI_API_KEY` privately, `GEMINI_MODEL=gemini-2.5-flash`, and `ALLOWED_ORIGINS=https://memory-ai-two-eta.vercel.app`. Do not include `/dashboard`, a trailing slash, or `#` in the origin.
+In Supabase **Edge Functions → Secrets**, set `ALLOWED_ORIGINS=https://memory-ai-two-eta.vercel.app`. Each user enters their own Gemini key in app Settings; new AI requests go directly from their browser to Google. No operator Gemini key or model secret is required. Do not include `/dashboard`, a trailing slash, or `#` in the origin.
 
 Run in PowerShell from this repository:
 
@@ -22,7 +22,7 @@ npx.cmd supabase functions list --remote=iqdwixeogewcbxsdpioy
 
 Review the migration dry run and confirm the CLI's hosted-operation prompts. If it reports incompatible or unknown migration history, stop and reconcile it; do not reset a live database. Supabase CLI v3 targets the local stack by default for database commands; `--remote` selects the linked hosted project. See the [official CLI v3 migration guide](https://supabase.com/docs/guides/local-development/cli/migrating-to-v3). Docker is not needed for hosted database operations. On Windows, `npx.cmd` avoids PowerShell's blocked `npx.ps1` shim without changing execution policy.
 
-Keep the existing Vercel project's production URL. Verify that its public Supabase URL/key refer to this same project. Set the hosted Auth Site URL and redirects as described below, then sign in and test Settings → AI connection, a note, an upload, and a memory question. A configured key indicator does not prove that the provider key works; the connection test does.
+Keep the existing Vercel project's production URL. Verify that its public Supabase URL/key refer to this same project. Set the hosted Auth Site URL and redirects as described below, then sign in and test Settings → AI connection, a note, an upload, and a memory question. A personal key indicator means a key has been entered; use Test Connection to check it with Google. Keys are entered again after reload.
 
 ## New Supabase project, same existing Vercel URL
 
@@ -38,13 +38,13 @@ Keep the existing Vercel project's production URL. Verify that its public Supaba
    ```
 
    Enter the new database password in the local prompt if requested. On a genuinely empty project all five checked-in migrations should be pending. Do not run these against the old project by mistake, and do not paste passwords into chat or commit them.
-3. In **Supabase → Edge Functions → Secrets**, set `GEMINI_API_KEY`, `GEMINI_MODEL=gemini-2.5-flash`, and `ALLOWED_ORIGINS=https://YOUR_EXISTING_VERCEL_DOMAIN`. Include the exact custom domain too if users access both. Supabase supplies the `SUPABASE_*` runtime secrets; do not attempt to overwrite those built-ins. Then deploy:
+3. In **Supabase → Edge Functions → Secrets**, set `ALLOWED_ORIGINS=https://YOUR_EXISTING_VERCEL_DOMAIN`. Users configure their own personal Gemini keys inside the app; do not install an operator key for AI requests. Include the exact custom domain too if users access both. Supabase supplies the `SUPABASE_*` runtime secrets; do not attempt to overwrite those built-ins. Then deploy:
 
    ```sh
    npx supabase functions deploy --remote=YOUR_NEW_PROJECT_REF
    ```
 
-   This deploys all eight functions using their checked-in per-function dependency configuration and authentication settings. The scheduled email function remains inactive until its optional secrets/scheduler are configured.
+   This deploys all eight function entry points using their checked-in dependency/authentication settings. The retired `ai` and `ask-memory` endpoints return HTTP 410, so older clients cannot use a shared operator key. The scheduled email function remains inactive until its optional secrets/scheduler are configured.
 4. In **Supabase → Authentication → URL Configuration**, set Site URL to `https://YOUR_EXISTING_VERCEL_DOMAIN` and add these exact redirects:
 
    ```text
@@ -75,11 +75,13 @@ Using Supabase CLI, link the intended project, review its migration history, the
 
 These remove direct browser writes to provider mappings/memories, install searchable chunks and quotas, and add ownership-checked chat/toggle operations. Existing originals are retained. Historical records with inconsistent provider identifiers require operator review before privileged deletion.
 
-Set Edge secrets `GEMINI_API_KEY`, `GEMINI_MODEL=gemini-2.5-flash`, and `ALLOWED_ORIGINS` (actual frontend origins, comma-separated without trailing slashes). Hosted Supabase provides its URL, anon key and service-role key. Deploy `ai`, `ask-memory`, `create-note`, `delete-memory`, `manage-memory`, `upload-memory`, and `load-demo-data` using `supabase/config.toml`.
+Set Edge secret `ALLOWED_ORIGINS` (actual frontend origins, comma-separated without trailing slashes). Hosted Supabase provides its URL, anon key and service-role key. Deploy `ai`, `ask-memory`, `create-note`, `delete-memory`, `manage-memory`, `upload-memory`, and `load-demo-data` using `supabase/config.toml`.
 
 Register deployed `/dashboard` and `/reset-password` URLs in the Auth redirect allowlist, set the site URL, and configure Google OAuth if required. Test registration, confirmation, recovery and two-user isolation in staging before accepting private data.
 
-New retrieval uses database text chunks rather than persistent Gemini File Search stores. Bounded excerpts or a single visual document are sent to Google. Legacy AI resources are removed only when their remote ownership metadata matches the user. Missing credentials or unverifiable ownership produces an explicit error rather than false cleanup success.
+AI uses a personal Gemini key entered by each user in Settings. For both demo and signed-in cloud accounts, selected memory excerpts, question/history, or a visual document go directly from the browser to Google with that user’s key; quota and any billing follow the Google project owning the key. Supabase receives saved memory text, original attachments, and conversations, but not the personal API key. The key is held only in tab memory, is isolated by sign-in identity, and clears on reload/sign-out. Text excerpt search and manual notes/reminders work without a key.
+
+New ingestion creates no Gemini File Search stores. A legacy cleanup helper remains only for resources created by older server-key releases: it requires the original operator key and verifies remote ownership metadata before deletion. It does not generate AI content or accept personal keys. Unverifiable legacy resources produce an explicit error and need separate operator review; do not substitute a new user’s key. After resolving any such legacy resources, remove unused `GEMINI_API_KEY`/`GEMINI_MODEL` server secrets.
 
 ## Optional email delivery
 

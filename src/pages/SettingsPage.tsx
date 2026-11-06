@@ -9,6 +9,7 @@ import { api, formatStorageSize, USER_STORAGE_CAP_BYTES } from '../services/api'
 import { UserStats } from '../types';
 import { geminiService, SUPPORTED_MODELS, DEFAULT_MODEL } from '../services/gemini';
 import { useAIStatus } from '../hooks/useAIStatus';
+import {getGeneration} from '../lib/storageMode';
 import {
   User,
   ShieldCheck,
@@ -33,7 +34,7 @@ import {
 export const SettingsPage: React.FC = () => {
   const { user, signOut, isDemoUser, isSupabaseActive } = useAuth();
   const navigate = useNavigate();
-  const {status: aiStatus, setStatus: setAIStatus} = useAIStatus();
+  const {status: aiStatus} = useAIStatus();
 
   const [stats, setStats] = useState<UserStats>({
     total: 0,
@@ -59,9 +60,9 @@ export const SettingsPage: React.FC = () => {
     loadStats();
     // Load existing Gemini config
     const existingKey = geminiService.getApiKey();
-    if (existingKey) setApiKey(existingKey);
+    setApiKey(existingKey);
     setSelectedModel(geminiService.getModel());
-  }, []);
+  }, [user?.id]);
 
   const loadStats = async () => {
     try {
@@ -73,22 +74,22 @@ export const SettingsPage: React.FC = () => {
   };
 
   const handleSaveApiKey = () => {
-    if(isDemoUser)geminiService.setApiKey(apiKey);
-    if(isDemoUser)setAIStatus(apiKey.trim() ? 'configured' : 'unavailable');
+    geminiService.setApiKey(apiKey);
     geminiService.setModel(selectedModel);
     setSaveKeySuccess(true);
     setTimeout(() => setSaveKeySuccess(false), 3000);
   };
 
   const handleTestApiKey = async () => {
+    const generation=getGeneration();
     setIsTestingKey(true);
     setTestResult(null);
     try {
       const res = await geminiService.testConnection(apiKey.trim(), selectedModel);
+      if(generation!==getGeneration())return;
       setTestResult(res);
       if (res.success) {
-        setAIStatus('configured');
-        if(isDemoUser)geminiService.setApiKey(apiKey);
+        geminiService.setApiKey(apiKey);
         geminiService.setModel(selectedModel);
       }
     } catch (err: any) {
@@ -115,7 +116,7 @@ export const SettingsPage: React.FC = () => {
   };
 
   const handleDeleteAll = async () => {
-    setPurging(true);try{await api.clearAllMemories();setApiKey('');if(isDemoUser)setAIStatus('unavailable');await loadStats();setDeleteConfirmOpen(false);}finally{setPurging(false);}
+    setPurging(true);try{await api.clearAllMemories();setApiKey('');await loadStats();setDeleteConfirmOpen(false);}finally{setPurging(false);}
   };
 
   const hasConfiguredGemini = aiStatus === 'configured';
@@ -307,16 +308,16 @@ export const SettingsPage: React.FC = () => {
                   hasConfiguredGemini ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
                 }`}
               />
-              {aiStatus === 'checking' ? 'Checking AI setup…' : hasConfiguredGemini ? 'AI key configured (test below)' : 'AI setup unavailable (test below)'}
+              {hasConfiguredGemini ? 'Your API key is set (test below)' : 'Add your Gemini API key'}
             </span>
           </div>
         </div>
 
-        {!isDemoUser&&<p className="text-xs text-text-secondary">Cloud AI credentials are managed by the server operator. Test the connection below; no private API key is needed in your browser.</p>}
+        <p className="text-xs text-text-secondary">Use your own Gemini API key. AI requests go directly from this browser to Google using your key and your Google project’s quota or billing.</p>
         {/* API Key Input */}
-        <div hidden={!isDemoUser} className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between">
-            <label className="text-xs font-semibold text-text-primary">Session-only demo API key</label>
+            <label htmlFor="gemini-api-key" className="text-xs font-semibold text-text-primary">Your Gemini API key</label>
             <a
               href="https://aistudio.google.com/app/apikey"
               target="_blank"
@@ -330,10 +331,13 @@ export const SettingsPage: React.FC = () => {
 
           <div className="relative flex items-center">
             <input
+              id="gemini-api-key"
+              autoComplete="off"
+              spellCheck={false}
               type={showApiKey ? 'text' : 'password'}
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
-              placeholder="Optional session-only key for the local demo"
+              placeholder="Paste your personal Gemini API key"
               className="w-full bg-bg-base border border-border rounded-xl pl-4 pr-12 py-2.5 text-xs text-text-primary font-mono placeholder:text-text-muted focus:outline-none focus:border-accent"
             />
             <div className="absolute right-2 flex items-center gap-1">
@@ -348,7 +352,7 @@ export const SettingsPage: React.FC = () => {
             </div>
           </div>
           <span className="text-[10px] text-text-muted">
-            Cloud AI uses a server secret. Demo keys are held only in this tab’s memory until reload or sign-out; they are never saved in browser storage.
+            Your key stays in this tab’s memory until reload or sign-out. It is sent only to Google, never saved to Supabase or browser storage. Save an empty key to remove it.
           </span>
         </div>
 
@@ -391,7 +395,7 @@ export const SettingsPage: React.FC = () => {
             <button
               type="button"
               onClick={handleTestApiKey}
-              disabled={isTestingKey || (isDemoUser && !apiKey.trim())}
+              disabled={isTestingKey || !apiKey.trim()}
               className="px-4 py-2 rounded-lg bg-bg-hover hover:bg-surface-container-high border border-border text-xs font-medium text-text-primary disabled:opacity-40 flex items-center gap-2 transition-all"
             >
               <Activity className={`w-3.5 h-3.5 text-accent ${isTestingKey ? 'animate-spin' : ''}`} />

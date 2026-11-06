@@ -9,7 +9,7 @@ Deno.serve(endpoint('manage-memory',async(req,{admin,client,userId})=>{
    if(!rows?.length)throw new HttpError(404,'Memory not found.');
    return {memory:rows[0]};
  }
- if(body.action==='capabilities')return {ai:!!Deno.env.get('GEMINI_API_KEY'),emailReminders:!!Deno.env.get('RESEND_API_KEY')&&!!Deno.env.get('REMINDER_FROM_EMAIL')&&(Deno.env.get('REMINDER_CRON_SECRET')||'').length>=32};
+ if(body.action==='capabilities')return {ai:false,aiMode:'user-key',emailReminders:!!Deno.env.get('RESEND_API_KEY')&&!!Deno.env.get('REMINDER_FROM_EMAIL')&&(Deno.env.get('REMINDER_CRON_SECRET')||'').length>=32};
  if(body.action==='delete-account'){
    const count=await admin.from('memories').select('id',{count:'exact',head:true}).eq('user_id',userId);if(count.error)throw count.error;
    if(count.count)throw new HttpError(409,'Purge your vault before deleting the account.');

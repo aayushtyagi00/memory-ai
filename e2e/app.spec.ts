@@ -2,6 +2,33 @@ import {test,expect,type Page} from '@playwright/test';
 import {zipSync,strToU8} from 'fflate';
 import {readFileSync} from 'node:fs';
 async function demo(page:Page){await page.goto('/');await page.getByRole('button',{name:'Explore Interactive Demo'}).click();await expect(page).toHaveURL(/\/ask/);}
+
+test('personal key settings send OCR and Q&A directly to Google and clear on reload',async({page})=>{
+ const key='browser-personal-test-key';const content='Receipt amount is 427 rupees.';const requests:string[]=[];let memoryId='';
+ await page.route('https://generativelanguage.googleapis.com/**',async route=>{
+   const request=route.request();if(request.method()==='OPTIONS'){await route.fulfill({status:204,headers:{'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'content-type,x-goog-api-key','Access-Control-Allow-Methods':'POST,OPTIONS'}});return;}
+   expect(request.headers()['x-goog-api-key']).toBe(key);requests.push(request.url());
+   const parts=request.postDataJSON().contents[0].parts;
+   const text=parts.some((p:{inlineData?:unknown})=>p.inlineData)?JSON.stringify({extractedText:content,title:'Receipt',category:'Financial',tags:[]}):memoryId?JSON.stringify({answer:content,foundInformation:true,conflictDetected:false,sources:[{memoryId,snippet:content}]}):'OK';
+   await route.fulfill({json:{candidates:[{content:{parts:[{text}]}}]},headers:{'Access-Control-Allow-Origin':'*'}});
+ });
+ await demo(page);await page.locator('a[href="/settings"]').first().click();
+ await page.getByLabel('Your Gemini API key',{exact:true}).fill(key);
+ await page.getByRole('button',{name:'Test Connection',exact:true}).click();
+ await expect(page.getByText(/Connection Verified!/)).toBeVisible();
+ expect(await page.evaluate(()=>JSON.stringify({local:{...localStorage},session:{...sessionStorage}}))).not.toContain(key);
+ await page.locator('a[href="/add"]').first().click();
+ await expect(page.getByRole('heading',{name:'Add Memory',exact:true})).toBeVisible();
+ await page.locator('input[type=file]').setInputFiles({name:'receipt.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aT7sAAAAASUVORK5CYII=','base64')});
+ await page.getByRole('button',{name:'Index Memory',exact:true}).click();await expect(page).toHaveURL(/\/memories\//);
+ memoryId=page.url().split('/').pop()!;await expect(page.getByText(content,{exact:true}).last()).toBeVisible();
+ await page.locator('a[href="/ask"]').first().click();
+ await page.getByPlaceholder('Ask a question about your documents, notes or receipts... (Enter to send)').fill('What is the receipt amount?');
+ await page.getByPlaceholder('Ask a question about your documents, notes or receipts... (Enter to send)').press('Enter');
+ await expect(page.getByText(content,{exact:true}).first()).toBeVisible();expect(requests).toHaveLength(3);
+ await page.locator('a[href="/settings"]').first().click();await expect(page.getByLabel('Your Gemini API key',{exact:true})).toHaveValue(key);
+ await page.reload();await expect(page.getByLabel('Your Gemini API key',{exact:true})).toHaveValue('');
+});
 function pdf(text:string){const stream=`BT /F1 12 Tf 30 150 Td (${text}) Tj ET`;const objects=['<< /Type /Catalog /Pages 2 0 R >>','<< /Type /Pages /Kids [3 0 R] /Count 1 >>','<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 200] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>','<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`];let out='%PDF-1.4\n';const offsets=[0];for(let i=0;i<objects.length;i++){offsets.push(Buffer.byteLength(out));out+=`${i+1} 0 obj\n${objects[i]}\nendobj\n`;}const xref=Buffer.byteLength(out);out+='xref\n0 6\n0000000000 65535 f \n'+offsets.slice(1).map(n=>String(n).padStart(10,'0')+' 00000 n \n').join('')+`trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;return Buffer.from(out);}
 test('local demo persists a real note, favorites, chat and deletion',async({page})=>{
  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));await demo(page);await page.goto('/add');await page.getByRole('button',{name:'Write Note'}).click();await page.getByLabel('Title',{exact:true}).fill('Launch checklist');await page.getByLabel('Content',{exact:true}).fill('The launch code is ALPHA-427 and the meeting is Tuesday.');await page.getByRole('button',{name:/Save|Index Note/i}).click();await expect(page).toHaveURL(/\/memories\//);await expect(page.getByText('The launch code is ALPHA-427 and the meeting is Tuesday.',{exact:true}).last()).toBeVisible();const memoryURL=page.url();await page.getByTitle('Add to Favorites').click();await expect(page.getByTitle('Favorited')).toBeVisible();await page.reload();await expect(page.getByTitle('Favorited')).toBeVisible();await page.goto('/ask?q=launch%20code');await expect(page.getByText(/ALPHA-427/).first()).toBeVisible();await page.reload();await expect(page.getByText(/ALPHA-427/).first()).toBeVisible();await page.goto(memoryURL);page.once('dialog',dialog=>dialog.accept());await page.getByTitle('Delete Memory').click();await expect(page).toHaveURL(/\/memories$/);await page.goto(memoryURL);await expect(page.getByRole('heading',{name:'Memory Not Found'})).toBeVisible();expect(errors).toEqual([]);

@@ -93,7 +93,7 @@ export const DashboardPage: React.FC = () => {
                 className="font-mono text-[9px] px-2 py-0.5 rounded bg-amber-400/10 text-amber-400 border border-amber-400/20 hover:bg-amber-400/20 transition-colors flex items-center gap-1"
               >
                 <Key className="w-2.5 h-2.5" />
-                {aiStatus === 'checking' ? 'Checking AI setup…' : 'Check AI setup'}
+                Add your API key
               </Link>
             )}
           </div>

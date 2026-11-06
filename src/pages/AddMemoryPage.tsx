@@ -666,7 +666,7 @@ export const AddMemoryPage: React.FC = () => {
                     <span className="font-mono text-text-primary flex items-center gap-2">
                       <Activity className="w-3.5 h-3.5 text-accent animate-spin" />
                       {uploadStatus === 'uploading' && 'Uploading file to personal store...'}
-                      {uploadStatus === 'processing' && 'Indexing into Gemini Retrieval Store...'}
+                      {uploadStatus === 'processing' && 'Saving your searchable memory...'}
                       {uploadStatus === 'ready' && 'Indexing complete! Ready to retrieve.'}
                     </span>
                     <span className="font-mono text-text-muted">{uploadProgress}%</span>

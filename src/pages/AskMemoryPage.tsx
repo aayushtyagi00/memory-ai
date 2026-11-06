@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { api } from '../services/api';
 import { geminiService } from '../services/gemini';
+import {useAIStatus} from '../hooks/useAIStatus';
 import { Source, ChatMessage, ChatConversation } from '../types';
 import { SourceCard } from '../components/common/SourceCard';
 import { getImageFromIndexedDB } from '../utils/indexedDb';
@@ -56,7 +57,8 @@ export const AskMemoryPage: React.FC = () => {
   const [loadingStage, setLoadingStage] = useState<'searching' | 'reading' | 'idle'>('idle');
   const [mobileSourceDrawerOpen, setMobileSourceDrawerOpen] = useState(false);
   const [mobileHistoryDrawerOpen, setMobileHistoryDrawerOpen] = useState(false);
-  const [hasApiKey, setHasApiKey] = useState(geminiService.hasApiKey());
+  const {status: aiStatus}=useAIStatus();
+  const hasApiKey=aiStatus==='configured';
   const [showKeyModal, setShowKeyModal] = useState(false);
   const [modalKeyInput, setModalKeyInput] = useState('');
   const [unindexedImagesCount, setUnindexedImagesCount] = useState(0);
@@ -82,7 +84,7 @@ export const AskMemoryPage: React.FC = () => {
   useEffect(() => {
     let alive=true;
     const token=++view.current;
-    setHasApiKey(geminiService.hasApiKey());
+
     api.listConversations().then(list=>{if(!alive||token!==view.current)return;setConversations(list);if(initialQuery&&automaticQuery.current!==initialQuery){automaticQuery.current=initialQuery;void handleSend(initialQuery,true);}else if(!initialQuery&&list.length){const latest=list[0];setCurrentConversationId(latest.id);setMessages(latest.messages);setActiveSources(latest.activeSources||[]);}}).catch(reportError);
     checkUnindexedImages();
     return()=>{alive=false;view.current++;busy.current=false;};
@@ -253,7 +255,7 @@ export const AskMemoryPage: React.FC = () => {
   const handleSaveModalKey = () => {
     if (modalKeyInput.trim()) {
       geminiService.setApiKey(modalKeyInput.trim());
-      setHasApiKey(true);
+
       setShowKeyModal(false);
     }
   };
@@ -395,7 +397,7 @@ export const AskMemoryPage: React.FC = () => {
           <div className="p-2.5 rounded-xl bg-bg-base border border-border text-[11px] font-mono text-text-muted">
             <div className="flex items-center gap-1.5 text-accent font-semibold mb-1">
               <ShieldCheck className="w-3.5 h-3.5" />
-              <span>{hasApiKey ? 'Gemini AI Active' : 'Demo Mode Active'}</span>
+              <span>{hasApiKey ? 'Your Gemini key is set' : 'Text search active'}</span>
             </div>
             <p className="text-[10px] text-text-muted leading-relaxed">
               {hasApiKey
@@ -432,7 +434,7 @@ export const AskMemoryPage: React.FC = () => {
                 {hasApiKey ? (
                   <span className="font-mono text-[9px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    Cloud AI configured
+                    Your API key is set
                   </span>
                 ) : (
                   <button
@@ -721,7 +723,7 @@ export const AskMemoryPage: React.FC = () => {
           </div>
           <div className="max-w-4xl mx-auto flex items-center justify-between text-[10px] font-mono text-text-muted mt-2 px-1">
             <span>Shift + Enter for new line</span>
-            <span>{hasApiKey ? '⚡ AI configured' : 'Demo Mode Active'}</span>
+            <span>{hasApiKey ? '⚡ AI configured' : 'Text search active'}</span>
           </div>
         </div>
       </div>
@@ -852,7 +854,7 @@ export const AskMemoryPage: React.FC = () => {
 
       {/* Quick API Key Modal */}
       {showKeyModal && (
-        <Dialog label="Session-only demo key" onClose={()=>setShowKeyModal(false)}>
+        <Dialog label="Your Gemini API key" onClose={()=>setShowKeyModal(false)}>
           <div className="p-6 rounded-2xl bg-bg-elevated border border-border max-w-md w-full flex flex-col gap-4 shadow-surface">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-xl bg-accent-soft border border-accent/30 flex items-center justify-center text-accent">
@@ -860,7 +862,7 @@ export const AskMemoryPage: React.FC = () => {
               </div>
               <div>
                 <h3 className="text-sm font-bold text-text-primary">Connect Gemini API Key</h3>
-                <p className="text-[11px] text-text-muted">Enable real-time grounded reasoning for your memories</p>
+                <p className="text-[11px] text-text-muted">Requests go directly to Google using your account. Your key stays in this tab until reload or sign-out.</p>
               </div>
             </div>
 
@@ -870,7 +872,9 @@ export const AskMemoryPage: React.FC = () => {
                 type="password"
                 value={modalKeyInput}
                 onChange={(e) => setModalKeyInput(e.target.value)}
-                placeholder="AIzaSy..."
+                autoComplete="off"
+                spellCheck={false}
+                placeholder="Your personal Gemini API key"
                 className="w-full bg-bg-base border border-border rounded-xl px-3.5 py-2.5 text-xs text-text-primary font-mono focus:outline-none focus:border-accent"
               />
               <span className="text-[10px] text-text-muted">
@@ -881,7 +885,7 @@ export const AskMemoryPage: React.FC = () => {
                   rel="noopener noreferrer"
                   className="text-accent underline"
                 >
-                  Get free key on Google AI Studio
+                  Get a key on Google AI Studio
                 </a>
               </span>
             </div>

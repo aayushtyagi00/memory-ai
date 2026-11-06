@@ -15,7 +15,7 @@ For cloud sign-in, set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` using `.
 - PDF, DOCX, XLSX, TXT, Markdown, CSV, JSON, PNG, JPG and WEBP uploads, up to 15 MB. Originals are retained. Convert unsupported legacy `.doc` files first.
 - Text PDFs, Word documents and spreadsheets are parsed locally. Scanned PDFs/images require AI transcription. Failed extraction is visible, with the saved original available for review or retry.
 - Cloud Q&A searches user-owned text chunks and sends bounded excerpts to Google Gemini. Source quotes must match stored text. AI synthesis and OCR can still be wrong; review original evidence.
-- The demo provides deterministic excerpt search. Optional personal Gemini keys are kept in tab memory only until reload/sign-out. Cloud AI uses a server secret.
+- Both demo and cloud accounts use each user’s own Gemini key, entered in Settings and held only in tab memory until reload/sign-out. AI requests go directly to Google under that key’s project/quota; no shared server key is used for AI. Without a key, grounded text excerpt search remains available.
 - Timezone-aware reminders, completion, duplicate checks, and optional email delivery after configuring Resend and a scheduler. The local demo sends no emails.
 - Plaintext backup export/restore up to 50 MB. Restore adds records. Sample documents without binary originals restore as notes. Large-vault archival export is not implemented; download originals individually.
 - Retryable purge removes memories, originals, linked reminders and chats. Cleanup failures are reported. Cloud account deletion requires successful purge first.
