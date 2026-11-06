@@ -2,6 +2,28 @@
 
 Code changes do not update a hosted database or deploy functions automatically. Deploy the migrations, functions, and frontend together. Do not use the new frontend against the old write policies.
 
+## Existing Memory Ai project: complete the backend deployment
+
+The existing frontend uses origin `https://memory-ai-two-eta.vercel.app` and the linked Supabase project reference is `iqdwixeogewcbxsdpioy`. A public check on 6 November 2026 found the frontend reachable, but all seven app-facing Edge Functions returned HTTP 404 (function not found). A database push does not deploy these functions.
+
+In Supabase **Edge Functions → Secrets**, set `GEMINI_API_KEY` privately, `GEMINI_MODEL=gemini-2.5-flash`, and `ALLOWED_ORIGINS=https://memory-ai-two-eta.vercel.app`. Do not include `/dashboard`, a trailing slash, or `#` in the origin.
+
+Run in PowerShell from this repository:
+
+```powershell
+npx.cmd supabase login
+npx.cmd supabase link --project-ref iqdwixeogewcbxsdpioy
+npx.cmd supabase migration list --remote
+npx.cmd supabase db push --dry-run --remote
+npx.cmd supabase db push --remote
+npx.cmd supabase functions deploy --remote=iqdwixeogewcbxsdpioy
+npx.cmd supabase functions list --remote=iqdwixeogewcbxsdpioy
+```
+
+Review the migration dry run and confirm the CLI's hosted-operation prompts. If it reports incompatible or unknown migration history, stop and reconcile it; do not reset a live database. Supabase CLI v3 targets the local stack by default for database commands; `--remote` selects the linked hosted project. See the [official CLI v3 migration guide](https://supabase.com/docs/guides/local-development/cli/migrating-to-v3). Docker is not needed for hosted database operations. On Windows, `npx.cmd` avoids PowerShell's blocked `npx.ps1` shim without changing execution policy.
+
+Keep the existing Vercel project's production URL. Verify that its public Supabase URL/key refer to this same project. Set the hosted Auth Site URL and redirects as described below, then sign in and test Settings → AI connection, a note, an upload, and a memory question. A configured key indicator does not prove that the provider key works; the connection test does.
+
 ## New Supabase project, same existing Vercel URL
 
 1. Create a new project in the Supabase Dashboard and retain its database password privately. Copy the project reference, project URL, and public anon/publishable key from the project's connection/API settings. Existing users and files do not transfer automatically.
@@ -10,15 +32,16 @@ Code changes do not update a hosted database or deploy functions automatically. 
    ```sh
    npx supabase login
    npx supabase link --project-ref YOUR_NEW_PROJECT_REF
-   npx supabase db push --dry-run
-   npx supabase db push
+   npx supabase migration list --remote
+   npx supabase db push --dry-run --remote
+   npx supabase db push --remote
    ```
 
    Enter the new database password in the local prompt if requested. On a genuinely empty project all five checked-in migrations should be pending. Do not run these against the old project by mistake, and do not paste passwords into chat or commit them.
 3. In **Supabase → Edge Functions → Secrets**, set `GEMINI_API_KEY`, `GEMINI_MODEL=gemini-2.5-flash`, and `ALLOWED_ORIGINS=https://YOUR_EXISTING_VERCEL_DOMAIN`. Include the exact custom domain too if users access both. Supabase supplies the `SUPABASE_*` runtime secrets; do not attempt to overwrite those built-ins. Then deploy:
 
    ```sh
-   npx supabase functions deploy --project-ref YOUR_NEW_PROJECT_REF
+   npx supabase functions deploy --remote=YOUR_NEW_PROJECT_REF
    ```
 
    This deploys all eight functions using their checked-in per-function dependency configuration and authentication settings. The scheduled email function remains inactive until its optional secrets/scheduler are configured.
@@ -44,7 +67,7 @@ The CSP permits standard `*.supabase.co` endpoints. For custom Supabase domains 
 
 ## Database and functions
 
-Using Supabase CLI, link the intended project, review its migration history, then apply `supabase db push`. Apply all migrations in filename order, including:
+Using Supabase CLI, link the intended project, review its migration history, then apply `supabase db push --remote`. Apply all migrations in filename order, including:
 
 - `20261105000000_authoritative_vault.sql`
 - `20261105010000_reminder_delivery.sql`

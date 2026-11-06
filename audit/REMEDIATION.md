@@ -22,19 +22,19 @@ The baseline audit is historical. The application source has been repaired; this
 |---|---|
 | Frontend TypeScript | Passed |
 | Production build and service-worker asset generation | Passed |
-| Regression tests (including actual SQL migrations in embedded PostgreSQL) | 31 passed |
+| Regression tests (including actual SQL migrations in embedded PostgreSQL) | 36 passed |
 | All eight Edge Function entry points, with frozen dependency lock | Passed |
 | Chrome browser workflows | 8 passed |
 | Fresh external dependency advisory scan | Blocked by automatic approval review |
 
 The browser checks cover note/favorite/chat persistence and deletion, PDF/DOCX text extraction and originals, password recovery route and honest unconfigured sign-in, mobile dialog focus/Escape, offline warm start, XLSX cells, backup export/purge/restore, and retention of the original after failed OCR. The installed Chrome was used because the downloaded Playwright browser failed to launch in this environment. `PLAYWRIGHT_CHANNEL=chrome` selects that option; CI can use the normal downloaded Chromium.
 
-The full file inventory also caught two JPEG reference images carrying `.png` extensions. Those files now have `.jpg` extensions; image pixels were not changed. `audit/check-files.mjs` checks all 105 current first-party files, including embedded reference-HTML script syntax, JSON and image signatures, without exposing `.env` values.
+The full file inventory also caught two JPEG reference images carrying `.png` extensions. Those files now have `.jpg` extensions; image pixels were not changed. `audit/check-files.mjs` checks current first-party files, including embedded reference-HTML script syntax, JSON and image signatures, without exposing `.env` values.
 
 The earlier successful npm audit reported zero vulnerabilities after dependency updates. Dependencies have not changed during this follow-up check. A fresh scan was rejected because sending dependency names/versions from the lockfile to npm requires approval; zero current advisories is therefore not asserted from this run.
 
 ## Deployment and operational checks still required
 
-The repository has no configured live credentials. Hosted Supabase Auth/Storage/Edge behavior, actual Google AI responses, real email delivery, and production response headers have not been exercised. Apply all migrations (including `20261106000000_atomic_toggles.sql`), deploy the functions, set server secrets/origins, register auth redirects and configure the optional reminder scheduler. See `docs/DEPLOYMENT.md`.
+A public check on 6 November 2026 confirmed the Vercel site responds with HTTP 200, but all seven app-facing Supabase functions return HTTP 404 with `NOT_FOUND`. The backend is not deployed at the configured project. This agent session has no available authenticated Supabase CLI or connector, so remote migrations, secrets, Auth/Storage, AI responses and email delivery remain unverified. The frontend now checks server capabilities before reporting an AI key as configured, and provides actionable backend errors. Apply all migrations (including `20261106000000_atomic_toggles.sql`), deploy the functions, set server secrets/origins, register auth redirects and configure the optional reminder scheduler. See `docs/DEPLOYMENT.md`.
 
 The local demo is intentionally unencrypted browser storage. Cloud writes require network access; there is no automatic offline sync queue. Backups are plaintext and limited to 50 MB; large-vault archive jobs remain outside the implemented scope. AI synthesis/OCR can be incorrect even when a quoted excerpt matches the source. These are documented product limitations, not verified guarantees of safety.

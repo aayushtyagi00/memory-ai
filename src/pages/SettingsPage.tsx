@@ -8,6 +8,7 @@ import { useAuth } from '../context/AuthContext';
 import { api, formatStorageSize, USER_STORAGE_CAP_BYTES } from '../services/api';
 import { UserStats } from '../types';
 import { geminiService, SUPPORTED_MODELS, DEFAULT_MODEL } from '../services/gemini';
+import { useAIStatus } from '../hooks/useAIStatus';
 import {
   User,
   ShieldCheck,
@@ -32,6 +33,7 @@ import {
 export const SettingsPage: React.FC = () => {
   const { user, signOut, isDemoUser, isSupabaseActive } = useAuth();
   const navigate = useNavigate();
+  const {status: aiStatus, setStatus: setAIStatus} = useAIStatus();
 
   const [stats, setStats] = useState<UserStats>({
     total: 0,
@@ -72,6 +74,7 @@ export const SettingsPage: React.FC = () => {
 
   const handleSaveApiKey = () => {
     if(isDemoUser)geminiService.setApiKey(apiKey);
+    if(isDemoUser)setAIStatus(apiKey.trim() ? 'configured' : 'unavailable');
     geminiService.setModel(selectedModel);
     setSaveKeySuccess(true);
     setTimeout(() => setSaveKeySuccess(false), 3000);
@@ -84,6 +87,7 @@ export const SettingsPage: React.FC = () => {
       const res = await geminiService.testConnection(apiKey.trim(), selectedModel);
       setTestResult(res);
       if (res.success) {
+        setAIStatus('configured');
         if(isDemoUser)geminiService.setApiKey(apiKey);
         geminiService.setModel(selectedModel);
       }
@@ -111,10 +115,10 @@ export const SettingsPage: React.FC = () => {
   };
 
   const handleDeleteAll = async () => {
-    setPurging(true);try{await api.clearAllMemories();setApiKey('');await loadStats();setDeleteConfirmOpen(false);}finally{setPurging(false);}
+    setPurging(true);try{await api.clearAllMemories();setApiKey('');if(isDemoUser)setAIStatus('unavailable');await loadStats();setDeleteConfirmOpen(false);}finally{setPurging(false);}
   };
 
-  const hasConfiguredGemini = geminiService.hasApiKey();
+  const hasConfiguredGemini = aiStatus === 'configured';
   const authProvider = isDemoUser ? 'Local demo' : user?.app_metadata?.provider || 'Cloud account';
   const userDisplayName = user ? (user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User') : 'Guest User';
 
@@ -303,7 +307,7 @@ export const SettingsPage: React.FC = () => {
                   hasConfiguredGemini ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
                 }`}
               />
-              {hasConfiguredGemini ? 'AI configured (test below)' : 'Local text search'}
+              {aiStatus === 'checking' ? 'Checking AI setup…' : hasConfiguredGemini ? 'AI key configured (test below)' : 'AI setup unavailable (test below)'}
             </span>
           </div>
         </div>

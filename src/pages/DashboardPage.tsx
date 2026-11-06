@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
-import { geminiService } from '../services/gemini';
+import { useAIStatus } from '../hooks/useAIStatus';
 import { Memory, UserStats, Reminder } from '../types';
 import {
   Sparkles,
@@ -33,10 +33,10 @@ export const DashboardPage: React.FC = () => {
   const [upcomingReminders, setUpcomingReminders] = useState<Reminder[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
-  const [hasApiKey, setHasApiKey] = useState(geminiService.hasApiKey());
+  const {status: aiStatus} = useAIStatus();
+  const hasApiKey = aiStatus === 'configured';
 
   useEffect(() => {
-    setHasApiKey(geminiService.hasApiKey());
     loadDashboardData();
   }, []);
 
@@ -85,7 +85,7 @@ export const DashboardPage: React.FC = () => {
             {hasApiKey ? (
               <span className="font-mono text-[9px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                Gemini Active
+                AI key configured
               </span>
             ) : (
               <Link
@@ -93,7 +93,7 @@ export const DashboardPage: React.FC = () => {
                 className="font-mono text-[9px] px-2 py-0.5 rounded bg-amber-400/10 text-amber-400 border border-amber-400/20 hover:bg-amber-400/20 transition-colors flex items-center gap-1"
               >
                 <Key className="w-2.5 h-2.5" />
-                Connect Gemini API
+                {aiStatus === 'checking' ? 'Checking AI setup…' : 'Check AI setup'}
               </Link>
             )}
           </div>
@@ -126,7 +126,7 @@ export const DashboardPage: React.FC = () => {
 
         <div className="relative z-10 max-w-2xl">
           <span className="font-mono text-[10px] text-accent font-semibold tracking-wider uppercase">
-            {hasApiKey ? 'AI CONNECTION CONFIGURED' : 'GROUNDED RETRIEVAL ENGINE'}
+            {hasApiKey ? 'AI KEY CONFIGURED · TEST IN SETTINGS' : 'SEARCH YOUR SAVED MEMORIES'}
           </span>
           <h2 className="text-lg sm:text-xl font-bold text-text-primary mt-1 mb-3">
             What would you like to retrieve from your memory?
