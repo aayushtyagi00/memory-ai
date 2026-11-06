@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import {reportError} from '../components/common/Feedback';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { api } from '../services/api';
 import { geminiService } from '../services/gemini';
@@ -53,21 +54,25 @@ export const MemoryDetailPage: React.FC = () => {
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [transcribeNotice, setTranscribeNotice] = useState<string | null>(null);
 
+  const requestId=useRef(0);
   const hasApiKey = geminiService.hasApiKey();
 
   useEffect(() => {
     if (id) {
       loadMemory(id);
     }
+    return()=>{requestId.current++;};
   }, [id]);
 
   const loadMemory = async (memId: string) => {
-    setLoading(true);
+    const request=++requestId.current;
+    setLoading(true);setMemory(null);setFileUrl(null);setAiSummary(null);setIsEditing(false);
     try {
       const [data, allReminders] = await Promise.all([
         api.getMemory(memId),
         api.listReminders(),
       ]);
+      if(request!==requestId.current)return;
       setMemory(data);
       if (data) {
         setEditTitle(data.title);
@@ -77,17 +82,17 @@ export const MemoryDetailPage: React.FC = () => {
         setReminders(allReminders.filter((r) => r.source_memory_id === memId));
 
         if (data.storage_path) {
-          api.getFileUrl(data.storage_path).then((url) => {
-            setFileUrl(url);
-          }).catch(() => {});
+          api.getFileUrl(data.storage_path,data.id).then((url) => {
+            if(request===requestId.current)setFileUrl(url);
+          }).catch(reportError);
         } else {
           setFileUrl(null);
         }
       }
     } catch (err) {
-      console.error('Failed to load memory:', err);
+      reportError(err);
     } finally {
-      setLoading(false);
+      if(request===requestId.current)setLoading(false);
     }
   };
 
@@ -101,7 +106,7 @@ export const MemoryDetailPage: React.FC = () => {
 
   const handleDelete = async () => {
     if (!memory) return;
-    if (window.confirm('Delete this memory? It will be removed from your Gemini store and database.')) {
+    if (window.confirm('Delete this memory? Its original attachment and searchable text will be removed.')) {
       await api.deleteMemory(memory.id);
       navigate('/memories');
     }
@@ -122,7 +127,7 @@ export const MemoryDetailPage: React.FC = () => {
         setIsEditing(false);
       }
     } catch (err) {
-      console.error('Save failed:', err);
+      reportError(err);
     } finally {
       setIsSaving(false);
     }
@@ -148,13 +153,12 @@ export const MemoryDetailPage: React.FC = () => {
         const prompt = `Provide a concise 2-sentence executive summary and 3 key takeaways from this stored memory:
 Title: ${memory.title}
 Content:
-${memory.content || memory.description || ''}`;
+${(memory.content || memory.description || '').slice(0,30000)}`;
 
         const summary = await geminiService.callGenerateContent(prompt, 'You are an executive summarization assistant for Memory AI.');
         setAiSummary(summary);
       } else {
-        // Fallback summary
-        setAiSummary(`Summary for ${memory.title}: Stored under category "${memory.category || 'General'}" on ${new Date(memory.created_at).toLocaleDateString()}. Contains verified reference details and verified indexing status ready for grounded retrieval.`);
+        setAiSummary('AI summarization is unavailable. The original text is displayed below.');
       }
     } catch (e: any) {
       setAiSummary('Failed to generate summary: ' + (e?.message || 'Error'));
@@ -246,7 +250,7 @@ ${memory.content || memory.description || ''}`;
             </button>
           )}
 
-          {memory.type === 'image' && (
+          {(memory.type === 'image' || memory.mime_type === 'application/pdf') && (
             <button
               onClick={handleTranscribeImage}
               disabled={isTranscribing}
@@ -330,7 +334,7 @@ ${memory.content || memory.description || ''}`;
       )}
 
       {/* Image Preview (if image) */}
-      {memory.type === 'image' && (fileUrl || memory.storage_path) && (
+      {(memory.type === 'image' || memory.mime_type === 'application/pdf') && (fileUrl || memory.storage_path) && (
         <div className="p-4 rounded-2xl bg-bg-elevated border border-border flex flex-col items-center">
           <div className="max-h-96 rounded-xl overflow-hidden border border-border shadow-md">
             <img
@@ -342,6 +346,7 @@ ${memory.content || memory.description || ''}`;
         </div>
       )}
 
+      {memory.indexing_status!=='ready'&&<p role="status" className="p-4 border border-amber-500 rounded text-amber-200">{memory.indexing_error||'Text extraction is incomplete. Retry OCR for PDF/images, or edit the searchable text below.'}</p>}
       {/* Main Detail Card / Edit Form */}
       <div className="p-6 md:p-8 rounded-2xl bg-bg-elevated border border-border shadow-surface flex flex-col gap-6">
         {isEditing ? (
@@ -358,8 +363,8 @@ ${memory.content || memory.description || ''}`;
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="text-xs font-medium text-text-secondary block mb-1">Title</label>
-                <input
+                <label htmlFor="MemoryDetailPage-field-366" className="text-xs font-medium text-text-secondary block mb-1">Title</label>
+                <input id="MemoryDetailPage-field-366"
                   type="text"
                   value={editTitle}
                   onChange={(e) => setEditTitle(e.target.value)}
@@ -368,8 +373,8 @@ ${memory.content || memory.description || ''}`;
               </div>
 
               <div>
-                <label className="text-xs font-medium text-text-secondary block mb-1">Category</label>
-                <select
+                <label htmlFor="MemoryDetailPage-field-376" className="text-xs font-medium text-text-secondary block mb-1">Category</label>
+                <select id="MemoryDetailPage-field-376"
                   value={editCategory}
                   onChange={(e) => setEditCategory(e.target.value)}
                   className="w-full bg-bg-base border border-border rounded-xl px-3.5 py-2 text-xs text-text-primary focus:outline-none focus:border-accent"
@@ -385,7 +390,7 @@ ${memory.content || memory.description || ''}`;
 
             {/* Tags */}
             <div>
-              <label className="text-xs font-medium text-text-secondary block mb-1">Tags</label>
+              <label htmlFor="MemoryDetailPage-field-407" className="text-xs font-medium text-text-secondary block mb-1">Tags</label>
               <div className="flex flex-wrap gap-1.5 mb-2">
                 {editTags.map((t) => (
                   <span
@@ -400,7 +405,7 @@ ${memory.content || memory.description || ''}`;
                 ))}
               </div>
               <div className="flex gap-2">
-                <input
+                <input id="MemoryDetailPage-field-407"
                   type="text"
                   value={tagInput}
                   onChange={(e) => setTagInput(e.target.value)}
@@ -425,8 +430,8 @@ ${memory.content || memory.description || ''}`;
 
             {/* Content */}
             <div>
-              <label className="text-xs font-medium text-text-secondary block mb-1">Content</label>
-              <textarea
+              <label htmlFor="MemoryDetailPage-field-433" className="text-xs font-medium text-text-secondary block mb-1">Content</label>
+              <textarea id="MemoryDetailPage-field-433"
                 rows={8}
                 value={editContent}
                 onChange={(e) => setEditContent(e.target.value)}

@@ -1,3 +1,4 @@
+import {reportError} from '../components/common/Feedback';
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
@@ -34,8 +35,8 @@ export const MemoryLibraryPage: React.FC = () => {
 
   const [isTranscribingBatch, setIsTranscribingBatch] = useState(false);
   const [unindexedImagesCount, setUnindexedImagesCount] = useState(0);
-  const [ghostImagesCount, setGhostImagesCount] = useState(0);
-  const [isCleaningGhosts, setIsCleaningGhosts] = useState(false);
+
+
   const [dismissUnindexedBanner, setDismissUnindexedBanner] = useState(false);
   const [transcribeNotice, setTranscribeNotice] = useState<{
     type: 'success' | 'warning' | 'info';
@@ -48,36 +49,9 @@ export const MemoryLibraryPage: React.FC = () => {
   useEffect(() => {
     let isSubscribed = true;
     const computeUnindexed = async () => {
-      const unindexed = memories.filter(
-        (m) =>
-          (m.type === 'image' ||
-            /\.(png|jpe?g|webp|gif|bmp|tiff|heic)$/i.test(m.original_file_name || '') ||
-            m.title.toLowerCase().includes('screenshot')) &&
-          (!m.content ||
-            m.content.length < 50 ||
-            m.content.startsWith('Image uploaded:') ||
-            m.content.startsWith('Uploaded file:') ||
-            m.content.startsWith('Uploaded '))
-      );
+      const unindexed = memories.filter(m=>(m.type==='image'||m.mime_type==='application/pdf')&&m.indexing_status!=='ready');
 
-      let indexable = 0;
-      let ghosts = 0;
-      for (const m of unindexed) {
-        let hasImage = false;
-        if (m.storage_path && (m.storage_path.startsWith('data:') || m.storage_path.startsWith('http'))) {
-          hasImage = true;
-        } else {
-          const inDb = (await getImageFromIndexedDB(m.id)) || (await getImageFromIndexedDB(m.storage_path || ''));
-          if (inDb) hasImage = true;
-        }
-        if (hasImage) indexable++;
-        else ghosts++;
-      }
-
-      if (isSubscribed) {
-        setUnindexedImagesCount(indexable);
-        setGhostImagesCount(ghosts);
-      }
+      if (isSubscribed) {setUnindexedImagesCount(unindexed.length);}
     };
 
     computeUnindexed();
@@ -86,28 +60,7 @@ export const MemoryLibraryPage: React.FC = () => {
     };
   }, [memories]);
 
-  const handleCleanGhosts = async () => {
-    setIsCleaningGhosts(true);
-    try {
-      const removed = await api.cleanGhostMemories();
-      setGhostImagesCount(0);
-      setTranscribeNotice({
-        type: 'success',
-        message: `Removed ${removed} incomplete screenshot record${removed === 1 ? '' : 's'}. You can now upload fresh screenshots in Add Memory.`,
-        actionText: 'Add Screenshots',
-        actionLink: '/add',
-      });
-      await loadMemories();
-      setTimeout(() => setTranscribeNotice(null), 8000);
-    } catch (err: any) {
-      setTranscribeNotice({
-        type: 'warning',
-        message: 'Cleanup notice: ' + (err?.message || 'Error cleaning records'),
-      });
-    } finally {
-      setIsCleaningGhosts(false);
-    }
-  };
+
 
   const handleIndexAllImages = async () => {
     setIsTranscribingBatch(true);
@@ -128,9 +81,9 @@ export const MemoryLibraryPage: React.FC = () => {
       } else if (res.count === 0 && res.failed > 0) {
         setTranscribeNotice({
           type: 'warning',
-          message: `Could not index ${res.failed} screenshot${res.failed === 1 ? '' : 's'}: Original image files were not stored in browser cache. Click "Clean Up Ghosts" to remove these empty records.`,
-          actionText: 'Clean Up Ghosts',
-          onAction: handleCleanGhosts,
+          message: `Could not index ${res.failed} screenshot${res.failed === 1 ? '' : 's'}: Review the original in Memory Library and retry extraction; re-upload it only if missing.`,
+          actionText: 'Open Memory Library',
+          actionLink: '/memories',
         });
       } else {
         setTranscribeNotice({
@@ -160,7 +113,7 @@ export const MemoryLibraryPage: React.FC = () => {
       const data = await api.listMemories();
       setMemories(data);
     } catch (err) {
-      console.error('Error loading library:', err);
+      reportError(err);
     } finally {
       setLoading(false);
     }
@@ -241,42 +194,7 @@ export const MemoryLibraryPage: React.FC = () => {
       </div>
 
       {/* Ghost Images Detected Banner */}
-      {ghostImagesCount > 0 && (
-        <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
-          <div className="flex items-center gap-2.5">
-            <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
-            <div>
-              <span className="font-semibold text-text-primary">
-                {ghostImagesCount} incomplete screenshot record{ghostImagesCount > 1 ? 's' : ''} detected
-              </span>
-              <p className="text-[11px] text-text-muted mt-0.5">
-                These records have missing image files from earlier uploads and cannot be read by OCR.
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={handleCleanGhosts}
-              disabled={isCleaningGhosts}
-              className="px-3 py-1.5 rounded-lg bg-red-500/15 hover:bg-red-500/25 text-red-300 border border-red-500/30 text-xs font-medium flex items-center gap-1.5 transition-colors disabled:opacity-50"
-            >
-              {isCleaningGhosts ? (
-                <Clock className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <Trash2 className="w-3.5 h-3.5" />
-              )}
-              <span>Remove Incomplete ({ghostImagesCount})</span>
-            </button>
-            <button
-              onClick={() => setGhostImagesCount(0)}
-              className="text-text-muted hover:text-text-primary p-1"
-              title="Dismiss"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
-      )}
+
 
       {/* Unindexed Screenshots Banner */}
       {unindexedImagesCount > 0 && !dismissUnindexedBanner && (
@@ -438,7 +356,7 @@ export const MemoryLibraryPage: React.FC = () => {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredMemories.map((m) => (
-            <div
+            <div role="button" tabIndex={0} onKeyDown={event=>{if(event.target===event.currentTarget&&(event.key==='Enter'||event.key===' ')){event.preventDefault();event.currentTarget.click();}}}
               key={m.id}
               onClick={() => navigate(`/memories/${m.id}`)}
               className="p-5 rounded-2xl bg-bg-elevated border border-border hover:border-accent/40 hover:bg-bg-hover transition-all flex flex-col justify-between cursor-pointer group shadow-sm"

@@ -1,3 +1,5 @@
+import {Dialog} from '../components/common/Dialog';
+import {reportError} from '../components/common/Feedback';
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import { geminiService, ExtractedReminder } from '../services/gemini';
@@ -48,7 +50,7 @@ export const RemindersPage: React.FC = () => {
       const data = await api.listReminders();
       setReminders(data);
     } catch (err) {
-      console.error('Failed to load reminders:', err);
+      reportError(err);
     } finally {
       setLoading(false);
     }
@@ -93,7 +95,7 @@ export const RemindersPage: React.FC = () => {
       setDescription('');
       setDueDate('');
     } catch (err) {
-      console.error('Failed to create reminder:', err);
+      reportError(err);
     }
   };
 
@@ -113,52 +115,9 @@ export const RemindersPage: React.FC = () => {
         });
         setSelectedForImport(initialSelection);
         setAiScanModalOpen(true);
-      } else {
-        // Deterministic scan of synthetic test dataset
-        const syntheticFound: ExtractedReminder[] = [];
-        for (const m of memories) {
-          const content = `${m.title} ${m.description || ''} ${m.content || ''}`.toLowerCase();
-          if (content.includes('dbms') || content.includes('exam')) {
-            syntheticFound.push({
-              title: 'DBMS Final Examination',
-              description: 'Examination Hall 3, Block B at 10:00 AM. Bring ID card.',
-              due_at: '2026-09-24T10:00:00.000Z',
-              source_memory_id: m.id,
-              source_memory_title: m.title,
-            });
-          }
-          if (content.includes('internship') || content.includes('interview')) {
-            syntheticFound.push({
-              title: 'Nova Labs Internship Interview',
-              description: 'Google Meet with Alex Rivera. System Design & Coding.',
-              due_at: '2026-09-20T14:00:00.000Z',
-              source_memory_id: m.id,
-              source_memory_title: m.title,
-            });
-          }
-          if (content.includes('presentation') || content.includes('project')) {
-            syntheticFound.push({
-              title: 'Final-Year Project Presentation',
-              description: 'Seminar Room 102 at 11:30 AM. Submit slides 24 hours prior.',
-              due_at: '2026-09-27T11:30:00.000Z',
-              source_memory_id: m.id,
-              source_memory_title: m.title,
-            });
-          }
-        }
-
-        // Deduplicate
-        const unique = Array.from(new Map(syntheticFound.map((item) => [item.title, item])).values());
-        setExtractedReminders(unique);
-        const initialSelection: { [idx: number]: boolean } = {};
-        unique.forEach((_, idx) => {
-          initialSelection[idx] = true;
-        });
-        setSelectedForImport(initialSelection);
-        setAiScanModalOpen(true);
-      }
+      } else {throw new Error('Connect AI in Settings to scan documents. You can add reminders manually.');}
     } catch (err) {
-      console.error('AI reminder scan error:', err);
+      reportError(err);
     } finally {
       setIsAiScanning(false);
     }
@@ -260,7 +219,7 @@ export const RemindersPage: React.FC = () => {
             const isOverdue = rem.due_at && new Date(rem.due_at).getTime() < Date.now() && !isCompleted;
 
             return (
-              <div
+              <div role="button" tabIndex={0} onKeyDown={event=>{if(event.target===event.currentTarget&&(event.key==='Enter'||event.key===' ')){event.preventDefault();event.currentTarget.click();}}}
                 key={rem.id}
                 onClick={() => handleToggle(rem.id)}
                 className={`p-4 rounded-xl border transition-all flex items-start justify-between gap-4 cursor-pointer group ${
@@ -345,11 +304,11 @@ export const RemindersPage: React.FC = () => {
 
       {/* Manual Reminder Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <Dialog label="New reminder" onClose={()=>setIsModalOpen(false)}>
           <div className="p-6 rounded-2xl bg-bg-elevated border border-border max-w-md w-full flex flex-col gap-4 shadow-surface">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-bold text-text-primary">Create Reminder</h3>
-              <button
+              <button aria-label="Close reminder dialog"
                 onClick={() => setIsModalOpen(false)}
                 className="text-text-muted hover:text-text-primary p-1"
               >
@@ -359,8 +318,8 @@ export const RemindersPage: React.FC = () => {
 
             <form onSubmit={handleCreateReminder} className="flex flex-col gap-3">
               <div>
-                <label className="text-xs font-medium text-text-secondary block mb-1">Title</label>
-                <input
+                <label htmlFor="RemindersPage-field-321" className="text-xs font-medium text-text-secondary block mb-1">Title</label>
+                <input id="RemindersPage-field-321"
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
@@ -371,10 +330,10 @@ export const RemindersPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="text-xs font-medium text-text-secondary block mb-1">
+                <label htmlFor="RemindersPage-field-335" className="text-xs font-medium text-text-secondary block mb-1">
                   Description
                 </label>
-                <textarea
+                <textarea id="RemindersPage-field-335"
                   rows={3}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
@@ -384,10 +343,10 @@ export const RemindersPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="text-xs font-medium text-text-secondary block mb-1">
+                <label htmlFor="RemindersPage-field-348" className="text-xs font-medium text-text-secondary block mb-1">
                   Due Date &amp; Time
                 </label>
-                <input
+                <input id="RemindersPage-field-348"
                   type="datetime-local"
                   value={dueDate}
                   onChange={(e) => setDueDate(e.target.value)}
@@ -413,12 +372,12 @@ export const RemindersPage: React.FC = () => {
               </div>
             </form>
           </div>
-        </div>
+        </Dialog>
       )}
 
       {/* AI Scan Results Modal */}
       {aiScanModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <Dialog label="Import suggested reminders" onClose={()=>setAiScanModalOpen(false)}>
           <div className="p-6 rounded-2xl bg-bg-elevated border border-border max-w-lg w-full flex flex-col gap-4 shadow-surface max-h-[85vh] overflow-hidden">
             <div className="flex items-center justify-between border-b border-border pb-3">
               <div className="flex items-center gap-2">
@@ -448,7 +407,7 @@ export const RemindersPage: React.FC = () => {
                 extractedReminders.map((item, idx) => {
                   const isChecked = selectedForImport[idx] ?? true;
                   return (
-                    <div
+                    <div role="button" tabIndex={0} onKeyDown={event=>{if(event.target===event.currentTarget&&(event.key==='Enter'||event.key===' ')){event.preventDefault();event.currentTarget.click();}}}
                       key={idx}
                       onClick={() =>
                         setSelectedForImport((prev) => ({ ...prev, [idx]: !isChecked }))
@@ -519,7 +478,7 @@ export const RemindersPage: React.FC = () => {
               </div>
             </div>
           </div>
-        </div>
+        </Dialog>
       )}
     </div>
   );

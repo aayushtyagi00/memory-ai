@@ -1,274 +1,44 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { getSupabaseClient, isSupabaseConfigured } from '../lib/supabase';
 import { User, Session } from '@supabase/supabase-js';
-
+import { setStorageMode } from '../lib/storageMode';
+import { geminiService } from '../services/gemini';
 interface AuthContextType {
-  user: User | null;
-  session: Session | null;
-  isLoading: boolean;
-  isDemoUser: boolean;
-  isSupabaseActive: boolean;
-  signIn: (email: string, password?: string) => Promise<{ error?: string }>;
-  signUp: (
-    email: string,
-    password?: string,
-    displayName?: string
-  ) => Promise<{ error?: string; requiresEmailVerification?: boolean }>;
-  signInWithGoogle: () => Promise<{ error?: string }>;
-  signOut: () => Promise<void>;
-  resetPassword: (email: string) => Promise<{ error?: string; success?: boolean }>;
-  enableDemoUser: () => void;
-  refreshSession: () => Promise<void>;
+  user:User|null;session:Session|null;isLoading:boolean;isDemoUser:boolean;isSupabaseActive:boolean;
+  signIn:(email:string,password?:string)=>Promise<{error?:string}>;
+  signUp:(email:string,password?:string,displayName?:string)=>Promise<{error?:string;requiresEmailVerification?:boolean}>;
+  signInWithGoogle:()=>Promise<{error?:string}>;signOut:()=>Promise<void>;
+  resetPassword:(email:string)=>Promise<{error?:string;success?:boolean}>;
+  enableDemoUser:()=>Promise<void>;refreshSession:()=>Promise<void>;
 }
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-const DEMO_USER_ID = 'demo-user-13506280';
-const DEMO_USER_OBJ = {
-  id: DEMO_USER_ID,
-  email: 'aayush@memory.ai',
-  user_metadata: {
-    full_name: 'Aayush',
-  },
-  app_metadata: {},
-  aud: 'authenticated',
-  created_at: '2026-09-01T00:00:00.000Z',
-} as User;
-
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isDemoUser, setIsDemoUser] = useState(false);
-  const [supabaseActive, setSupabaseActive] = useState(isSupabaseConfigured());
-
-  const syncAuthState = useCallback(async () => {
-    const configured = isSupabaseConfigured();
-    setSupabaseActive(configured);
-
-    const client = getSupabaseClient();
-    if (configured && client) {
-      try {
-        const { data: { session } } = await client.auth.getSession();
-        if (session) {
-          setSession(session);
-          setUser(session.user);
-          setIsDemoUser(false);
-          setIsLoading(false);
-          return;
-        }
-      } catch (err) {
-        console.warn('Error fetching Supabase session:', err);
-      }
-    }
-
-    // Fallback: check demo user session
-    const savedAuth = localStorage.getItem('memory_ai_auth_state');
-    if (savedAuth === 'true') {
-      setUser(DEMO_USER_OBJ);
-      setIsDemoUser(true);
-    } else {
-      setUser(null);
-      setIsDemoUser(false);
-      setSession(null);
-    }
-    setIsLoading(false);
-  }, []);
-
-  useEffect(() => {
-    syncAuthState();
-
-    const client = getSupabaseClient();
-    let unsubscribe: (() => void) | undefined;
-
-    if (client) {
-      const { data: { subscription } } = client.auth.onAuthStateChange((_event, newSession) => {
-        setSession(newSession);
-        setUser(newSession?.user ?? null);
-        if (newSession) {
-          setIsDemoUser(false);
-          localStorage.removeItem('memory_ai_auth_state');
-        }
-        setIsLoading(false);
-      });
-      unsubscribe = () => subscription.unsubscribe();
-    }
-
-    // Listen to custom configuration changes from Settings
-    const handleConfigChange = () => {
-      syncAuthState();
+const AuthContext=createContext<AuthContextType|undefined>(undefined);
+const DEMO_USER={id:'demo',email:'demo@local.invalid',user_metadata:{full_name:'Local Demo'},app_metadata:{provider:'demo'},aud:'demo',created_at:new Date(0).toISOString()} as User;
+const errorText=(error:unknown)=>error instanceof Error?error.message:'Authentication failed. Try again.';
+export const AuthProvider:React.FC<{children:React.ReactNode}>=({children})=>{
+  const [user,setUser]=useState<User|null>(null);const [session,setSession]=useState<Session|null>(null);const [isLoading,setLoading]=useState(true);const [isDemoUser,setDemo]=useState(false);const [active,setActive]=useState(isSupabaseConfigured());
+  const demo=useRef(sessionStorage.getItem('memory_ai_demo')==='true');
+  const apply=useCallback((session:Session|null)=>{
+    if(demo.current){setSession(null);setUser(DEMO_USER);setDemo(true);setStorageMode({kind:'demo'});}
+    else {setSession(session);setUser(session?.user||null);setDemo(false);setStorageMode(session?{kind:'cloud',userId:session.user.id}:{kind:'signed-out'});}
+    setLoading(false);
+  },[]);
+  const sync=useCallback(async()=>{const client=getSupabaseClient();setActive(isSupabaseConfigured());if(demo.current){apply(null);return;}if(!client){apply(null);return;}const {data,error}=await client.auth.getSession();if(error){apply(null);return;}apply(data.session);},[apply]);
+  useEffect(()=>{
+    let subscription:{unsubscribe:()=>void}|undefined;let alive=true;let epoch=0;
+    const bind=()=>{const current=++epoch;subscription?.unsubscribe();setActive(isSupabaseConfigured());const client=getSupabaseClient();
+      if(!client){apply(null);return;}
+      subscription=client.auth.onAuthStateChange((_event,newSession)=>{if(alive&&current===epoch){if(_event==='SIGNED_OUT'&&!demo.current)geminiService.setApiKey('');apply(newSession);}}).data.subscription;
+      client.auth.getSession().then(({data,error})=>{if(alive&&current===epoch)apply(error?null:data.session);}).catch(()=>{if(alive&&current===epoch)apply(null);});
     };
-
-    window.addEventListener('supabase-config-changed', handleConfigChange);
-
-    return () => {
-      if (unsubscribe) unsubscribe();
-      window.removeEventListener('supabase-config-changed', handleConfigChange);
-    };
-  }, [syncAuthState]);
-
-  const signIn = async (email: string, password?: string): Promise<{ error?: string }> => {
-    const client = getSupabaseClient();
-
-    if (isSupabaseConfigured() && client && password) {
-      try {
-        const { data, error } = await client.auth.signInWithPassword({
-          email: email.trim(),
-          password,
-        });
-        if (error) return { error: error.message };
-
-        setUser(data.user);
-        setSession(data.session);
-        setIsDemoUser(false);
-        localStorage.removeItem('memory_ai_auth_state');
-        return {};
-      } catch (err: any) {
-        return { error: err?.message || 'Authentication error occurred.' };
-      }
-    }
-
-    // Demo sign in
-    const demoUser = {
-      ...DEMO_USER_OBJ,
-      email: email.trim() || DEMO_USER_OBJ.email,
-      user_metadata: { full_name: email.split('@')[0] || 'Aayush' },
-    };
-    setUser(demoUser);
-    setIsDemoUser(true);
-    localStorage.setItem('memory_ai_auth_state', 'true');
-    return {};
-  };
-
-  const signUp = async (
-    email: string,
-    password?: string,
-    displayName?: string
-  ): Promise<{ error?: string; requiresEmailVerification?: boolean }> => {
-    const client = getSupabaseClient();
-
-    if (isSupabaseConfigured() && client && password) {
-      try {
-        const { data, error } = await client.auth.signUp({
-          email: email.trim(),
-          password,
-          options: {
-            data: { full_name: displayName || email.split('@')[0] },
-          },
-        });
-        if (error) return { error: error.message };
-
-        if (!data.session && data.user) {
-          // Email confirmation is enabled in Supabase
-          return { requiresEmailVerification: true };
-        }
-
-        setUser(data.user);
-        setSession(data.session);
-        setIsDemoUser(false);
-        localStorage.removeItem('memory_ai_auth_state');
-        return {};
-      } catch (err: any) {
-        return { error: err?.message || 'Registration error occurred.' };
-      }
-    }
-
-    // Demo sign up
-    const demoUser = {
-      ...DEMO_USER_OBJ,
-      email: email.trim() || DEMO_USER_OBJ.email,
-      user_metadata: { full_name: displayName || email.split('@')[0] },
-    };
-    setUser(demoUser);
-    setIsDemoUser(true);
-    localStorage.setItem('memory_ai_auth_state', 'true');
-    return {};
-  };
-
-  const signOut = async () => {
-    const client = getSupabaseClient();
-    if (client && isSupabaseConfigured()) {
-      try {
-        await client.auth.signOut();
-      } catch (err) {
-        console.warn('Error signing out of Supabase:', err);
-      }
-    }
-    setUser(null);
-    setSession(null);
-    setIsDemoUser(false);
-    localStorage.removeItem('memory_ai_auth_state');
-  };
-
-  const resetPassword = async (email: string): Promise<{ error?: string; success?: boolean }> => {
-    const client = getSupabaseClient();
-    if (isSupabaseConfigured() && client) {
-      try {
-        const { error } = await client.auth.resetPasswordForEmail(email.trim(), {
-          redirectTo: window.location.origin + '/login?reset=true',
-        });
-        if (error) return { error: error.message };
-        return { success: true };
-      } catch (err: any) {
-        return { error: err?.message || 'Failed to send password reset email.' };
-      }
-    }
-    return { error: 'Supabase is not configured yet. Add your Project URL & Anon Key in Settings.' };
-  };
-
-  const signInWithGoogle = async (): Promise<{ error?: string }> => {
-    const client = getSupabaseClient();
-    if (isSupabaseConfigured() && client) {
-      try {
-        const { error } = await client.auth.signInWithOAuth({
-          provider: 'google',
-          options: {
-            redirectTo: `${window.location.origin}/dashboard`,
-          },
-        });
-        if (error) return { error: error.message };
-        return {};
-      } catch (err: any) {
-        return { error: err?.message || 'Failed to initialize Google sign in.' };
-      }
-    }
-    return { error: 'Supabase backend is not configured in .env.' };
-  };
-
-  const enableDemoUser = () => {
-    setUser(DEMO_USER_OBJ);
-    setIsDemoUser(true);
-    localStorage.setItem('memory_ai_auth_state', 'true');
-  };
-
-  const refreshSession = async () => {
-    await syncAuthState();
-  };
-
-  return (
-    <AuthContext.Provider
-      value={{
-        user,
-        session,
-        isLoading,
-        isDemoUser,
-        isSupabaseActive: supabaseActive,
-        signIn,
-        signUp,
-        signInWithGoogle,
-        signOut,
-        resetPassword,
-        enableDemoUser,
-        refreshSession,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
-  );
+    bind();window.addEventListener('supabase-config-changed',bind);
+    return()=>{alive=false;subscription?.unsubscribe();window.removeEventListener('supabase-config-changed',bind);};
+  },[apply]);
+  const signIn=async(email:string,password?:string)=>{const client=getSupabaseClient();if(!client||!password)return {error:'Cloud sign-in is not configured. Use the clearly labeled local demo, or configure Supabase in .env.'};try{demo.current=false;sessionStorage.removeItem('memory_ai_demo');const {data,error}=await client.auth.signInWithPassword({email:email.trim(),password});if(error)return {error:error.message};apply(data.session);return {};}catch(e){return {error:errorText(e)};}};
+  const signUp=async(email:string,password?:string,displayName?:string)=>{const client=getSupabaseClient();if(!client||!password)return {error:'Cloud registration is not configured. Use the local demo or configure Supabase in .env.'};try{demo.current=false;sessionStorage.removeItem('memory_ai_demo');const {data,error}=await client.auth.signUp({email:email.trim(),password,options:{data:{full_name:displayName?.slice(0,100)||email.split('@')[0]},emailRedirectTo:window.location.origin+'/dashboard'}});if(error)return {error:error.message};if(!data.session)return {requiresEmailVerification:true};apply(data.session);return {};}catch(e){return {error:errorText(e)};}};
+  const signOut=async()=>{const client=getSupabaseClient();if(!demo.current&&client){const {error}=await client.auth.signOut();if(error)throw error;}demo.current=false;sessionStorage.removeItem('memory_ai_demo');localStorage.removeItem('memory_ai_auth_state');geminiService.setApiKey('');apply(null);};
+  const enableDemoUser=async()=>{const client=getSupabaseClient();if(client){const {error}=await client.auth.signOut({scope:'local'});if(error)throw error;}demo.current=true;sessionStorage.setItem('memory_ai_demo','true');geminiService.setApiKey('');apply(null);};
+  const resetPassword=async(email:string)=>{const client=getSupabaseClient();if(!client)return {error:'Configure Supabase in .env to send password recovery emails.'};try{const {error}=await client.auth.resetPasswordForEmail(email.trim(),{redirectTo:window.location.origin+'/reset-password'});return error?{error:error.message}:{success:true};}catch(e){return {error:errorText(e)};}};
+  const signInWithGoogle=async()=>{const client=getSupabaseClient();if(!client)return {error:'Configure Supabase and its Google provider first.'};demo.current=false;sessionStorage.removeItem('memory_ai_demo');const {error}=await client.auth.signInWithOAuth({provider:'google',options:{redirectTo:window.location.origin+'/dashboard'}});return error?{error:error.message}:{};};
+  return <AuthContext.Provider value={{user,session,isLoading,isDemoUser,isSupabaseActive:active,signIn,signUp,signOut,signInWithGoogle,resetPassword,enableDemoUser,refreshSession:sync}}>{children}</AuthContext.Provider>;
 };
-
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) throw new Error('useAuth must be used within an AuthProvider');
-  return context;
-};
+export function useAuth(){const context=useContext(AuthContext);if(!context)throw new Error('useAuth must be inside AuthProvider');return context;}

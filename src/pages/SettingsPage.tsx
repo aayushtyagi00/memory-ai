@@ -1,3 +1,7 @@
+import {Dialog} from '../components/common/Dialog';
+import {BackupControls} from '../components/common/BackupControls';
+import {ReminderPreferences} from '../components/common/ReminderPreferences';
+import {reportError} from '../components/common/Feedback';
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -26,7 +30,7 @@ import {
 } from 'lucide-react';
 
 export const SettingsPage: React.FC = () => {
-  const { user, signOut } = useAuth();
+  const { user, signOut, isDemoUser, isSupabaseActive } = useAuth();
   const navigate = useNavigate();
 
   const [stats, setStats] = useState<UserStats>({
@@ -37,6 +41,7 @@ export const SettingsPage: React.FC = () => {
     storageBytes: 0,
     storageLimitBytes: USER_STORAGE_CAP_BYTES,
   });
+  const [purging,setPurging]=useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [copiedUserId, setCopiedUserId] = useState(false);
 
@@ -61,12 +66,12 @@ export const SettingsPage: React.FC = () => {
       const s = await api.getStats();
       setStats(s);
     } catch (err) {
-      console.error(err);
+      reportError(err);
     }
   };
 
   const handleSaveApiKey = () => {
-    geminiService.setApiKey(apiKey);
+    if(isDemoUser)geminiService.setApiKey(apiKey);
     geminiService.setModel(selectedModel);
     setSaveKeySuccess(true);
     setTimeout(() => setSaveKeySuccess(false), 3000);
@@ -79,7 +84,7 @@ export const SettingsPage: React.FC = () => {
       const res = await geminiService.testConnection(apiKey.trim(), selectedModel);
       setTestResult(res);
       if (res.success) {
-        geminiService.setApiKey(apiKey);
+        if(isDemoUser)geminiService.setApiKey(apiKey);
         geminiService.setModel(selectedModel);
       }
     } catch (err: any) {
@@ -96,7 +101,7 @@ export const SettingsPage: React.FC = () => {
       setCopiedUserId(true);
       setTimeout(() => setCopiedUserId(false), 2000);
     } catch (err) {
-      console.error(err);
+      reportError(err);
     }
   };
 
@@ -106,13 +111,11 @@ export const SettingsPage: React.FC = () => {
   };
 
   const handleDeleteAll = async () => {
-    await api.clearAllMemories();
-    await loadStats();
-    setDeleteConfirmOpen(false);
+    setPurging(true);try{await api.clearAllMemories();setApiKey('');await loadStats();setDeleteConfirmOpen(false);}finally{setPurging(false);}
   };
 
-  const hasConfiguredGemini = Boolean(geminiService.getApiKey());
-  const authProvider = user ? (user?.app_metadata?.provider || (user?.email?.endsWith('@gmail.com') ? 'Google' : 'Supabase Auth')) : 'Guest Mode';
+  const hasConfiguredGemini = geminiService.hasApiKey();
+  const authProvider = isDemoUser ? 'Local demo' : user?.app_metadata?.provider || 'Cloud account';
   const userDisplayName = user ? (user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User') : 'Guest User';
 
   const storageUsed = stats.storageBytes || 0;
@@ -197,7 +200,7 @@ export const SettingsPage: React.FC = () => {
             <span className="text-[10px] font-mono text-text-muted uppercase">Account Status</span>
             <span className="text-xs font-medium text-emerald-400 flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>Active · Verified Private Vault</span>
+              <span>Signed in</span>
             </span>
           </div>
 
@@ -230,7 +233,7 @@ export const SettingsPage: React.FC = () => {
           </div>
           <div>
             <h2 className="text-sm font-bold text-text-primary">Data Privacy &amp; Encryption</h2>
-            <p className="text-[11px] text-text-muted">Strict privacy guarantees for your personal memory vault.</p>
+            <p className="text-[11px] text-text-muted">Review storage mode and AI processing before adding private information.</p>
           </div>
         </div>
 
@@ -241,7 +244,7 @@ export const SettingsPage: React.FC = () => {
               <span>Row Level Security</span>
             </div>
             <p className="text-[11px] text-text-muted leading-relaxed">
-              PostgreSQL Row Level Security (RLS) is active. Only your authenticated user ID can read or modify your data.
+              Cloud accounts use authenticated access and database row policies. The local demo stores data only in this browser.
             </p>
           </div>
 
@@ -251,17 +254,17 @@ export const SettingsPage: React.FC = () => {
               <span>Isolated Storage</span>
             </div>
             <p className="text-[11px] text-text-muted leading-relaxed">
-              Uploaded PDFs, notes, and receipts are compartmentalized in isolated cloud storage under your private folder.
+              Cloud originals are kept in a private user folder. Demo originals are kept in browser IndexedDB and are not encrypted by this app.
             </p>
           </div>
 
           <div className="p-3.5 rounded-xl bg-bg-base border border-border flex flex-col gap-1.5">
             <div className="flex items-center gap-2 text-xs font-semibold text-text-primary">
               <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span>Zero Public Sharing</span>
+              <span>AI Processing</span>
             </div>
             <p className="text-[11px] text-text-muted leading-relaxed">
-              Your indexed memories are strictly personal. They are never published publicly or shared with third parties.
+              Selected memory text and images are sent to Google when you use AI. The app does not publish your files publicly.
             </p>
           </div>
         </div>
@@ -300,15 +303,16 @@ export const SettingsPage: React.FC = () => {
                   hasConfiguredGemini ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
                 }`}
               />
-              {hasConfiguredGemini ? 'Gemini Active' : 'API Key Optional'}
+              {hasConfiguredGemini ? 'AI configured (test below)' : 'Local text search'}
             </span>
           </div>
         </div>
 
+        {!isDemoUser&&<p className="text-xs text-text-secondary">Cloud AI credentials are managed by the server operator. Test the connection below; no private API key is needed in your browser.</p>}
         {/* API Key Input */}
-        <div className="flex flex-col gap-2">
+        <div hidden={!isDemoUser} className="flex flex-col gap-2">
           <div className="flex items-center justify-between">
-            <label className="text-xs font-semibold text-text-primary">Gemini API Key</label>
+            <label className="text-xs font-semibold text-text-primary">Session-only demo API key</label>
             <a
               href="https://aistudio.google.com/app/apikey"
               target="_blank"
@@ -325,7 +329,7 @@ export const SettingsPage: React.FC = () => {
               type={showApiKey ? 'text' : 'password'}
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
-              placeholder="Configured via environment (or paste custom key here)"
+              placeholder="Optional session-only key for the local demo"
               className="w-full bg-bg-base border border-border rounded-xl pl-4 pr-12 py-2.5 text-xs text-text-primary font-mono placeholder:text-text-muted focus:outline-none focus:border-accent"
             />
             <div className="absolute right-2 flex items-center gap-1">
@@ -340,7 +344,7 @@ export const SettingsPage: React.FC = () => {
             </div>
           </div>
           <span className="text-[10px] text-text-muted">
-            API keys are kept strictly private on your device or in server environment variables (<code className="text-text-secondary">.env</code>).
+            Cloud AI uses a server secret. Demo keys are held only in this tab’s memory until reload or sign-out; they are never saved in browser storage.
           </span>
         </div>
 
@@ -374,16 +378,7 @@ export const SettingsPage: React.FC = () => {
             })}
           </div>
 
-          <div className="mt-2 flex flex-col sm:flex-row sm:items-center gap-2 p-2.5 rounded-xl bg-bg-base/70 border border-border">
-            <label className="text-[11px] text-text-muted whitespace-nowrap">Or custom model identifier:</label>
-            <input
-              type="text"
-              value={selectedModel}
-              onChange={(e) => setSelectedModel(e.target.value.trim())}
-              placeholder="e.g. gemini-2.5-flash or gemini-2.5-pro"
-              className="flex-1 bg-bg-elevated border border-border rounded-lg px-3 py-1.5 text-xs text-text-primary font-mono focus:outline-none focus:border-accent"
-            />
-          </div>
+
         </div>
 
         {/* Test Connection & Save Row */}
@@ -392,7 +387,7 @@ export const SettingsPage: React.FC = () => {
             <button
               type="button"
               onClick={handleTestApiKey}
-              disabled={isTestingKey || !apiKey.trim()}
+              disabled={isTestingKey || (isDemoUser && !apiKey.trim())}
               className="px-4 py-2 rounded-lg bg-bg-hover hover:bg-surface-container-high border border-border text-xs font-medium text-text-primary disabled:opacity-40 flex items-center gap-2 transition-all"
             >
               <Activity className={`w-3.5 h-3.5 text-accent ${isTestingKey ? 'animate-spin' : ''}`} />
@@ -447,6 +442,8 @@ export const SettingsPage: React.FC = () => {
         )}
       </div>
 
+      <BackupControls />
+      <ReminderPreferences />
       {/* 4. Vault Storage Overview */}
       <div className="p-6 rounded-2xl bg-bg-elevated border border-border shadow-surface flex flex-col gap-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border pb-4">
@@ -534,7 +531,7 @@ export const SettingsPage: React.FC = () => {
           <div>
             <h3 className="text-xs font-semibold text-text-primary">Purge Personal Memory Vault</h3>
             <p className="text-[11px] text-text-muted mt-0.5">
-              Permanently delete all indexed documents, notes, receipts, and linked reminders from your vault.
+              Permanently delete all documents, notes, attachments, chat history, and reminders from your vault.
             </p>
           </div>
 
@@ -550,14 +547,14 @@ export const SettingsPage: React.FC = () => {
 
       {/* Delete Confirmation Modal */}
       {deleteConfirmOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <Dialog label="Confirm vault purge" onClose={()=>setDeleteConfirmOpen(false)}>
           <div className="p-6 rounded-2xl bg-bg-elevated border border-border max-w-md w-full flex flex-col gap-4 shadow-surface">
             <div className="flex items-center gap-3 text-red-400">
               <AlertTriangle className="w-6 h-6" />
               <h3 className="text-sm font-bold text-text-primary">Confirm Deletion of All Memories</h3>
             </div>
             <p className="text-xs text-text-secondary leading-relaxed">
-              This will permanently delete all {stats.total} memories and reminders stored in your private vault. This action cannot be undone.
+              This will permanently delete all {stats.total} memories, attachments, chat history, and reminders stored in your private vault. This action cannot be undone.
             </p>
             <div className="flex items-center justify-end gap-3 pt-2">
               <button
@@ -567,14 +564,14 @@ export const SettingsPage: React.FC = () => {
                 Cancel
               </button>
               <button
-                onClick={handleDeleteAll}
+                disabled={purging} onClick={handleDeleteAll}
                 className="px-4 py-2 rounded-lg text-xs font-medium text-white bg-red-600 hover:bg-red-700 transition-colors"
               >
-                Yes, Purge Vault
+                {purging?'Deleting…':'Yes, Purge Vault'}
               </button>
             </div>
           </div>
-        </div>
+        </Dialog>
       )}
     </div>
   );

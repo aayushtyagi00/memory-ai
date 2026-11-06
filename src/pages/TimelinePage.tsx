@@ -1,3 +1,4 @@
+import {reportError} from '../components/common/Feedback';
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../services/api';
@@ -27,7 +28,7 @@ export const TimelinePage: React.FC = () => {
       const data = await api.listMemories();
       setMemories(data);
     } catch (err) {
-      console.error('Error loading timeline:', err);
+      reportError(err);
     } finally {
       setLoading(false);
     }

@@ -1,3 +1,5 @@
+import {Dialog} from '../components/common/Dialog';
+import {reportError} from '../components/common/Feedback';
 import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { api } from '../services/api';
@@ -58,8 +60,8 @@ export const AskMemoryPage: React.FC = () => {
   const [showKeyModal, setShowKeyModal] = useState(false);
   const [modalKeyInput, setModalKeyInput] = useState('');
   const [unindexedImagesCount, setUnindexedImagesCount] = useState(0);
-  const [ghostImagesCount, setGhostImagesCount] = useState(0);
-  const [isCleaningGhosts, setIsCleaningGhosts] = useState(false);
+
+
   const [dismissUnindexedBanner, setDismissUnindexedBanner] = useState(false);
   const [isTranscribingBatch, setIsTranscribingBatch] = useState(false);
   const [transcribeNotice, setTranscribeNotice] = useState<{
@@ -73,71 +75,32 @@ export const AskMemoryPage: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  const view=useRef(0);
+  const busy=useRef(false);
+  const automaticQuery=useRef('');
   // Load conversations and check memories on mount
   useEffect(() => {
+    let alive=true;
+    const token=++view.current;
     setHasApiKey(geminiService.hasApiKey());
-    loadConversationsList();
+    api.listConversations().then(list=>{if(!alive||token!==view.current)return;setConversations(list);if(initialQuery&&automaticQuery.current!==initialQuery){automaticQuery.current=initialQuery;void handleSend(initialQuery,true);}else if(!initialQuery&&list.length){const latest=list[0];setCurrentConversationId(latest.id);setMessages(latest.messages);setActiveSources(latest.activeSources||[]);}}).catch(reportError);
     checkUnindexedImages();
-  }, []);
+    return()=>{alive=false;view.current++;busy.current=false;};
+  }, [initialQuery]);
 
   const checkUnindexedImages = async () => {
     try {
       const list = await api.listMemories();
-      const unindexed = list.filter(
-        (m) =>
-          (m.type === 'image' ||
-            /\.(png|jpe?g|webp|gif|bmp|tiff|heic)$/i.test(m.original_file_name || '') ||
-            m.title.toLowerCase().includes('screenshot')) &&
-          (!m.content ||
-            m.content.length < 50 ||
-            m.content.startsWith('Image uploaded:') ||
-            m.content.startsWith('Uploaded file:') ||
-            m.content.startsWith('Uploaded '))
-      );
+      const unindexed = list.filter(m=>(m.type==='image'||m.mime_type==='application/pdf')&&m.indexing_status!=='ready');
 
-      let indexable = 0;
-      let ghosts = 0;
-      for (const m of unindexed) {
-        let hasImage = false;
-        if (m.storage_path && (m.storage_path.startsWith('data:') || m.storage_path.startsWith('http'))) {
-          hasImage = true;
-        } else {
-          const inDb = (await getImageFromIndexedDB(m.id)) || (await getImageFromIndexedDB(m.storage_path || ''));
-          if (inDb) hasImage = true;
-        }
-        if (hasImage) indexable++;
-        else ghosts++;
-      }
+      setUnindexedImagesCount(unindexed.length);
 
-      setUnindexedImagesCount(indexable);
-      setGhostImagesCount(ghosts);
     } catch {
       // ignore
     }
   };
 
-  const handleCleanGhosts = async () => {
-    setIsCleaningGhosts(true);
-    try {
-      const removed = await api.cleanGhostMemories();
-      setGhostImagesCount(0);
-      setTranscribeNotice({
-        type: 'success',
-        message: `Removed ${removed} incomplete screenshot record${removed === 1 ? '' : 's'}. You can now upload fresh screenshots in Add Memory.`,
-        actionText: 'Add Screenshots',
-        actionLink: '/add',
-      });
-      await checkUnindexedImages();
-      setTimeout(() => setTranscribeNotice(null), 8000);
-    } catch (err: any) {
-      setTranscribeNotice({
-        type: 'warning',
-        message: 'Cleanup notice: ' + (err?.message || 'Error cleaning records'),
-      });
-    } finally {
-      setIsCleaningGhosts(false);
-    }
-  };
+
 
   const handleIndexAllImages = async () => {
     if (!geminiService.hasApiKey()) {
@@ -162,9 +125,9 @@ export const AskMemoryPage: React.FC = () => {
       } else if (result.count === 0 && result.failed > 0) {
         setTranscribeNotice({
           type: 'warning',
-          message: `Could not index ${result.failed} screenshot${result.failed === 1 ? '' : 's'}: Original image files were not stored in browser cache. Click "Clean Up Ghosts" to remove these empty records.`,
-          actionText: 'Clean Up Ghosts',
-          onAction: handleCleanGhosts,
+          message: `Could not index ${result.failed} screenshot${result.failed === 1 ? '' : 's'}: Review the original in Memory Library and retry extraction; re-upload it only if missing.`,
+          actionText: 'Open Memory Library',
+          actionLink: '/memories',
         });
       } else {
         setTranscribeNotice({
@@ -184,8 +147,8 @@ export const AskMemoryPage: React.FC = () => {
     }
   };
 
-  const loadConversationsList = () => {
-    const list = api.listConversations();
+  const loadConversationsList = async () => {
+    const list = await api.listConversations();
     setConversations(list);
 
     // If initial query provided via URL, prepare new chat
@@ -209,16 +172,10 @@ export const AskMemoryPage: React.FC = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, loadingStage]);
 
-  // If query in URL, automatically trigger
-  useEffect(() => {
-    if (initialQuery && messages.length === 0) {
-      handleSend(initialQuery);
-    }
-  }, [initialQuery]);
-
-  const selectConversation = (convId: string) => {
-    const conv = api.getConversation(convId);
-    if (!conv) return;
+  const selectConversation = async (convId: string) => {
+    const token=++view.current;busy.current=false;setIsLoading(false);
+    const conv = await api.getConversation(convId);
+    if (!conv||token!==view.current) return;
     setCurrentConversationId(conv.id);
     setMessages(conv.messages);
     setActiveSources(conv.activeSources || []);
@@ -227,6 +184,7 @@ export const AskMemoryPage: React.FC = () => {
   };
 
   const startNewChat = () => {
+    view.current++;busy.current=false;setIsLoading(false);
     setCurrentConversationId(null);
     setMessages([]);
     setActiveSources([]);
@@ -235,10 +193,11 @@ export const AskMemoryPage: React.FC = () => {
     setMobileHistoryDrawerOpen(false);
   };
 
-  const handleDeleteConversation = (e: React.MouseEvent, convId: string) => {
+  const handleDeleteConversation = async (e: React.MouseEvent, convId: string) => {
     e.stopPropagation();
-    api.deleteConversation(convId);
-    const updated = api.listConversations();
+    view.current++;busy.current=false;setIsLoading(false);
+    await api.deleteConversation(convId);
+    const updated = await api.listConversations();
     setConversations(updated);
 
     if (currentConversationId === convId) {
@@ -250,92 +209,38 @@ export const AskMemoryPage: React.FC = () => {
     }
   };
 
-  const handleClearAllHistory = () => {
+  const handleClearAllHistory = async () => {
     if (window.confirm('Are you sure you want to clear all chat history?')) {
-      api.clearAllConversations();
+      await api.clearAllConversations();
       setConversations([]);
       startNewChat();
     }
   };
 
-  const handleSend = async (textToSend?: string) => {
-    const query = (textToSend || inputQuery).trim();
-    if (!query || isLoading) return;
-
-    const userMsg: ChatMessage = {
-      id: 'msg-' + Date.now(),
-      role: 'user',
-      content: query,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    };
-
-    const newMessages = [...messages, userMsg];
-    setMessages(newMessages);
-    setInputQuery('');
-    setIsLoading(true);
-    setLoadingStage('searching');
-
-    try {
-      setTimeout(() => {
-        setLoadingStage('reading');
-      }, 600);
-
-      const res = await api.askMemory(query, currentConversationId || undefined);
-
-      const assistantMsg: ChatMessage = {
-        id: 'msg-' + (Date.now() + 1),
-        role: 'assistant',
-        content: res.answer,
-        sources: res.sources,
-        conflictDetected: res.conflictDetected,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      };
-
-      const finalMessages = [...newMessages, assistantMsg];
-      setMessages(finalMessages);
-      setActiveSources(res.sources || []);
-      setActiveConflict(Boolean(res.conflictDetected));
-
-      // Persist conversation
-      let convId = currentConversationId;
-      let convTitle = '';
-      if (!convId) {
-        convId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : 'conv-' + Date.now();
-        convTitle = query.slice(0, 36) + (query.length > 36 ? '...' : '');
-        setCurrentConversationId(convId);
-      } else {
-        const existing = api.getConversation(convId);
-        convTitle = existing?.title || query.slice(0, 36);
-      }
-
-      const updatedConv: ChatConversation = {
-        id: convId,
-        title: convTitle,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        messages: finalMessages,
-        activeSources: res.sources || [],
-        conflictDetected: Boolean(res.conflictDetected),
-      };
-
-      api.saveConversation(updatedConv);
-      setConversations(api.listConversations());
-
-      if (res.sources && res.sources.length > 0 && window.innerWidth < 1024) {
-        setMobileSourceDrawerOpen(true);
-      }
-    } catch (err: any) {
-      const errorMsg: ChatMessage = {
-        id: 'msg-' + (Date.now() + 1),
-        role: 'assistant',
-        content: 'I encountered an error retrieving answers from your memories. Please verify your settings or try again.',
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      };
-      setMessages((prev) => [...prev, errorMsg]);
-    } finally {
-      setIsLoading(false);
-      setLoadingStage('idle');
-    }
+  const handleSend = async (textToSend?: string, fresh=false) => {
+    const query=(textToSend||inputQuery).trim();if(!query||busy.current)return;
+    if(query.length>2000){reportError('Questions are limited to 2,000 characters.');return;}
+    const token=++view.current;busy.current=true;setIsLoading(true);setLoadingStage('searching');setInputQuery('');
+    const convId=fresh?crypto.randomUUID():currentConversationId||crypto.randomUUID();
+    const previous=fresh?[]:messages;
+    if(previous.length>=198){busy.current=false;setIsLoading(false);reportError('This conversation is full. Start a new chat.');return;}
+    const userMsg:ChatMessage={id:crypto.randomUUID(),role:'user',content:query,timestamp:new Date().toISOString()};
+    const newMessages=[...previous,userMsg];setMessages(newMessages);setCurrentConversationId(convId);
+    const prior=conversations.find(c=>c.id===convId);
+    const conv:ChatConversation={id:convId,title:prior?.title||query.slice(0,80),created_at:prior?.created_at||new Date().toISOString(),updated_at:new Date().toISOString(),messages:newMessages};
+    try{
+      await api.saveConversation(conv);
+      if(token!==view.current)return;
+      setLoadingStage('reading');
+      const res=await api.askMemory(query,convId);
+      if(token!==view.current)return;
+      const assistant:ChatMessage={id:crypto.randomUUID(),role:'assistant',content:res.answer,sources:res.sources,conflictDetected:res.conflictDetected,timestamp:new Date().toISOString()};
+      const complete={...conv,messages:[...newMessages,assistant],activeSources:res.sources,conflictDetected:res.conflictDetected};
+      await api.saveConversation(complete);
+      if(token!==view.current)return;
+      setMessages(complete.messages);setActiveSources(res.sources);setActiveConflict(!!res.conflictDetected);
+      const list=await api.listConversations();if(token===view.current)setConversations(list);
+    }catch(error){if(token===view.current)reportError(error);}finally{if(token===view.current){busy.current=false;setIsLoading(false);setLoadingStage('idle');}}
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -387,7 +292,7 @@ export const AskMemoryPage: React.FC = () => {
   return (
     <div className="flex h-[calc(100vh-80px)] md:h-screen w-full overflow-hidden bg-bg-base">
       {/* 1. Left Sidebar: Chat History & New Conversation (Desktop) */}
-      <div className="hidden xl:flex flex-col justify-between w-68 border-r border-border bg-bg-elevated p-4 shrink-0 overflow-hidden">
+      <div className="hidden xl:flex flex-col justify-between w-[17rem] border-r border-border bg-bg-elevated p-4 shrink-0 overflow-hidden">
         <div className="flex flex-col gap-4 overflow-hidden flex-1">
           {/* New Chat Button */}
           <button
@@ -426,7 +331,7 @@ export const AskMemoryPage: React.FC = () => {
                 conversations.map((conv) => {
                   const isActive = currentConversationId === conv.id;
                   return (
-                    <div
+                    <div role="button" tabIndex={0} onKeyDown={event=>{if(event.target===event.currentTarget&&(event.key==='Enter'||event.key===' ')){event.preventDefault();event.currentTarget.click();}}}
                       key={conv.id}
                       onClick={() => selectConversation(conv.id)}
                       className={`group flex items-center justify-between p-2.5 rounded-xl cursor-pointer text-xs transition-all border ${
@@ -495,7 +400,7 @@ export const AskMemoryPage: React.FC = () => {
             <p className="text-[10px] text-text-muted leading-relaxed">
               {hasApiKey
                 ? `Using ${geminiService.getModel()} with grounded citations.`
-                : 'Using verified synthetic grounding dataset.'}
+                : 'Local search returns excerpts from the saved demo memories.'}
             </p>
           </div>
         </div>
@@ -527,7 +432,7 @@ export const AskMemoryPage: React.FC = () => {
                 {hasApiKey ? (
                   <span className="font-mono text-[9px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    Gemini Live
+                    Cloud AI configured
                   </span>
                 ) : (
                   <button
@@ -582,42 +487,7 @@ export const AskMemoryPage: React.FC = () => {
         )}
 
         {/* Ghost Images Detected Banner */}
-        {ghostImagesCount > 0 && (
-          <div className="mx-4 md:mx-6 mt-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-2.5">
-              <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
-              <div>
-                <span className="font-semibold text-text-primary">
-                  {ghostImagesCount} incomplete screenshot record{ghostImagesCount > 1 ? 's' : ''} detected
-                </span>
-                <p className="text-[11px] text-text-muted mt-0.5">
-                  These records have missing image files from earlier uploads and cannot be read by OCR.
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                onClick={handleCleanGhosts}
-                disabled={isCleaningGhosts}
-                className="px-3 py-1.5 rounded-lg bg-red-500/15 hover:bg-red-500/25 text-red-300 border border-red-500/30 text-xs font-medium flex items-center gap-1.5 transition-colors disabled:opacity-50"
-              >
-                {isCleaningGhosts ? (
-                  <Clock className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <Trash2 className="w-3.5 h-3.5" />
-                )}
-                <span>Remove Incomplete ({ghostImagesCount})</span>
-              </button>
-              <button
-                onClick={() => setGhostImagesCount(0)}
-                className="text-text-muted hover:text-text-primary p-1"
-                title="Dismiss"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          </div>
-        )}
+
 
         {/* Unindexed Screenshots Banner */}
         {unindexedImagesCount > 0 && !dismissUnindexedBanner && (
@@ -851,16 +721,14 @@ export const AskMemoryPage: React.FC = () => {
           </div>
           <div className="max-w-4xl mx-auto flex items-center justify-between text-[10px] font-mono text-text-muted mt-2 px-1">
             <span>Shift + Enter for new line</span>
-            <span>{hasApiKey ? '⚡ Gemini Grounding Active' : 'Demo Mode Active'}</span>
+            <span>{hasApiKey ? '⚡ AI configured' : 'Demo Mode Active'}</span>
           </div>
         </div>
       </div>
 
       {/* 3. Right: Grounding Sources Panel */}
       <div
-        className={`fixed lg:static inset-y-0 right-0 z-40 w-80 lg:w-88 border-l border-border bg-bg-elevated p-4 shrink-0 flex flex-col justify-between transition-transform duration-300 ${
-          mobileSourceDrawerOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'
-        }`}
+        className="hidden lg:flex w-80 border-l border-border bg-bg-elevated p-4 shrink-0 flex-col justify-between"
       >
         <div className="flex flex-col gap-4 overflow-y-auto">
           <div className="flex items-center justify-between border-b border-border pb-3">
@@ -893,13 +761,13 @@ export const AskMemoryPage: React.FC = () => {
               <ShieldCheck className="w-8 h-8 text-text-muted" />
               <p className="text-xs font-medium text-text-secondary">No sources retrieved yet</p>
               <p className="text-[11px] text-text-muted leading-relaxed">
-                When you ask a question, the retrieved file chunks, citations and verified evidence will be listed here.
+                When you ask a question, the retrieved file chunks, citations and matching excerpts will be listed here.
               </p>
             </div>
           ) : (
             <div className="flex flex-col gap-3">
               <span className="font-mono text-[10px] text-text-muted">
-                {activeSources.length} verified {activeSources.length === 1 ? 'citation' : 'citations'}:
+                {activeSources.length} source {activeSources.length === 1 ? 'citation' : 'citations'}:
               </span>
               {activeSources.map((source, idx) => (
                 <SourceCard key={source.id || idx} source={source} index={idx} />
@@ -909,14 +777,15 @@ export const AskMemoryPage: React.FC = () => {
         </div>
 
         <div className="pt-3 border-t border-border text-[10px] font-mono text-text-muted flex items-center justify-between">
-          <span>{hasApiKey ? geminiService.getModel() : 'Synthetic Dataset'}</span>
-          <span className="text-success">Verified Grounded</span>
+          <span>{hasApiKey ? geminiService.getModel() : 'Local Text Search'}</span>
+          <span className="text-success">Source excerpts</span>
         </div>
       </div>
 
+      {mobileSourceDrawerOpen&&<Dialog label="Source evidence" onClose={()=>setMobileSourceDrawerOpen(false)}><div className="max-w-lg w-full bg-bg-elevated rounded-xl p-6"><button onClick={()=>setMobileSourceDrawerOpen(false)} className="mb-4 underline">Close sources</button>{activeSources.map((source,index)=><SourceCard key={source.memoryId||index} source={source} index={index}/>)}</div></Dialog>}
       {/* Mobile Chat History Drawer */}
       {mobileHistoryDrawerOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex justify-start">
+        <Dialog label="Chat history" onClose={()=>setMobileHistoryDrawerOpen(false)}>
           <div className="w-72 max-w-[85vw] h-full bg-bg-elevated border-r border-border p-4 flex flex-col justify-between animate-slide-in">
             <div className="flex flex-col gap-4 overflow-hidden flex-1">
               <div className="flex items-center justify-between border-b border-border pb-3">
@@ -944,7 +813,7 @@ export const AskMemoryPage: React.FC = () => {
                 {conversations.map((conv) => {
                   const isActive = currentConversationId === conv.id;
                   return (
-                    <div
+                    <div role="button" tabIndex={0} onKeyDown={event=>{if(event.target===event.currentTarget&&(event.key==='Enter'||event.key===' ')){event.preventDefault();event.currentTarget.click();}}}
                       key={conv.id}
                       onClick={() => selectConversation(conv.id)}
                       className={`p-2.5 rounded-xl cursor-pointer text-xs flex items-center justify-between border ${
@@ -978,12 +847,12 @@ export const AskMemoryPage: React.FC = () => {
               </button>
             )}
           </div>
-        </div>
+        </Dialog>
       )}
 
       {/* Quick API Key Modal */}
       {showKeyModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <Dialog label="Session-only demo key" onClose={()=>setShowKeyModal(false)}>
           <div className="p-6 rounded-2xl bg-bg-elevated border border-border max-w-md w-full flex flex-col gap-4 shadow-surface">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-xl bg-accent-soft border border-accent/30 flex items-center justify-center text-accent">
@@ -996,8 +865,8 @@ export const AskMemoryPage: React.FC = () => {
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-text-secondary">API Key</label>
-              <input
+              <label htmlFor="AskMemoryPage-field-934" className="text-xs font-medium text-text-secondary">API Key</label>
+              <input id="AskMemoryPage-field-934"
                 type="password"
                 value={modalKeyInput}
                 onChange={(e) => setModalKeyInput(e.target.value)}
@@ -1035,7 +904,7 @@ export const AskMemoryPage: React.FC = () => {
               </button>
             </div>
           </div>
-        </div>
+        </Dialog>
       )}
     </div>
   );

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { Sparkles, LogIn, User } from 'lucide-react';
+import { Sparkles, LogIn, User, Database } from 'lucide-react';
 
 export const Header: React.FC = () => {
   const { user } = useAuth();
@@ -14,7 +14,7 @@ export const Header: React.FC = () => {
         <div className="flex items-center gap-8">
           <Link to={user ? "/dashboard" : "/"} className="flex items-center gap-3 transition-opacity hover:opacity-90">
             <div className="w-8 h-8 rounded-lg bg-bg-elevated border border-border flex items-center justify-center text-accent">
-              <span className="material-symbols-outlined text-[20px] text-accent">memory</span>
+              <Database aria-hidden="true" className="w-5 h-5 text-accent" />
             </div>
             <span className="font-mono text-sm font-semibold tracking-wider text-text-primary uppercase">
               MEMORY AI

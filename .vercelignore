@@ -1,0 +1,15 @@
+.git/
+.env*
+node_modules/
+dist/
+supabase/
+audit/
+docs/
+screens/
+tests/
+e2e/
+test-results/
+playwright-report/
+.github/
+playwright.config.ts
+vitest.config.ts

@@ -63,7 +63,7 @@ export const SourceCard: React.FC<SourceCardProps> = ({ source, index }) => {
             onClick={() => setExpanded(!expanded)}
             className="flex items-center justify-between w-full text-[11px] text-text-secondary hover:text-text-primary transition-colors font-mono"
           >
-            <span>Verified Evidence Snippet</span>
+            <span>Matching Source Excerpt</span>
             {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
           </button>
 

@@ -1,70 +1,37 @@
-# MEMORY AI — Your Private Searchable Personal Memory
+# Memory AI
 
-**Never lose important information again.**  
-Turn scattered documents, screenshots and notes into a searchable personal memory with grounded Google Gemini AI answers.
+A personal library for originals, searchable document text, notes, source-based Q&A, and reminders.
 
----
+## Local setup
 
-## ⚡ Google Gemini API Integration
+Use Node 24, then run `npm ci` and `npm run dev`.
 
-Memory AI is powered directly by the **Google Gemini API**:
-- **Grounded Q&A (`AskMemoryPage`)**: Gemini strictly retrieves information from your indexed documents and notes, always citing source files and exact snippets. If conflicting claims exist across your files, it highlights the discrepancy. If not found, it strictly replies: *"I couldn't find this information in your memories."*
-- **AI Auto-Tagging & Title Extraction (`AddMemoryPage`)**: Click **"✨ Auto-Fill with Gemini"** when creating a note to automatically generate a concise title, appropriate category, and relevant tags.
-- **Multimodal Vision Extraction (`AddMemoryPage`)**: Upload screenshots, receipts, or timetable images; Gemini Vision reads and transcribes text and numbers into your memory store.
-- **AI Reminders Extractor (`RemindersPage`)**: Click **"✨ AI Scan Memories"**; Gemini reviews all your stored memories, detects upcoming deadlines, exams, and payment dates, and allows 1-click importing into your reminders list.
-- **Model Switcher (`SettingsPage`)**: Easily switch between `gemini-2.5-flash` (recommended), `gemini-2.0-flash`, `gemini-1.5-flash`, and `gemini-1.5-pro`.
+**Explore Interactive Demo** opens a local demo without an account. Its IndexedDB data is not encrypted by this app and is shared with subsequent demo sessions in this browser. Cloud requests never silently fall back to that storage.
 
----
+For cloud sign-in, set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` using `.env.example`, then follow [deployment instructions](docs/DEPLOYMENT.md). The migrations and Edge Functions must also be deployed.
 
-## 🚀 Quick Start
+## Features and limits
 
-### 1. Install Dependencies
-```bash
-npm install
+- PDF, DOCX, XLSX, TXT, Markdown, CSV, JSON, PNG, JPG and WEBP uploads, up to 15 MB. Originals are retained. Convert unsupported legacy `.doc` files first.
+- Text PDFs, Word documents and spreadsheets are parsed locally. Scanned PDFs/images require AI transcription. Failed extraction is visible, with the saved original available for review or retry.
+- Cloud Q&A searches user-owned text chunks and sends bounded excerpts to Google Gemini. Source quotes must match stored text. AI synthesis and OCR can still be wrong; review original evidence.
+- The demo provides deterministic excerpt search. Optional personal Gemini keys are kept in tab memory only until reload/sign-out. Cloud AI uses a server secret.
+- Timezone-aware reminders, completion, duplicate checks, and optional email delivery after configuring Resend and a scheduler. The local demo sends no emails.
+- Plaintext backup export/restore up to 50 MB. Restore adds records. Sample documents without binary originals restore as notes. Large-vault archival export is not implemented; download originals individually.
+- Retryable purge removes memories, originals, linked reminders and chats. Cleanup failures are reported. Cloud account deletion requires successful purge first.
+- Public app assets are precached for offline warm starts. Cloud writes and AI require a connection. There is no hidden offline queue or automatic demo/cloud synchronization.
+
+## Checks
+
+```sh
+npm run typecheck
+npm test
+npm run check:edge
+npm run build
+npx playwright install chromium
+npm run test:e2e
 ```
 
-### 2. Configure Gemini API Key
-You can configure your key in either of two ways:
-- **In-App (Recommended)**: Go to **Settings** in the app, enter your Gemini API Key in the input field, test the connection with 1 click, and save it.
-- **Environment File**: Create a `.env` file from `.env.example`:
-  ```env
-  VITE_GEMINI_API_KEY=your_gemini_api_key_here
-  VITE_GEMINI_MODEL=gemini-2.5-flash
-  ```
-  *(Get a free key from [Google AI Studio](https://aistudio.google.com/app/apikey)).*
+Tests cover source validation, persistent originals, storage failures/concurrency, backup round-trips, quotas, tenant boundaries, chat ownership, reminder leasing, and browser workflows. `screens/` contains standalone design references, not the shipped application.
 
-> Note: If no API key is provided, the app continues to work in **Demo Grounding Mode** using the built-in synthetic benchmark dataset.
-
-### 3. Run Development Server
-```bash
-npm run dev
-```
-
-Open [http://localhost:5173](http://localhost:5173) in your browser.
-
----
-
-## 📱 Screen Catalog & Architecture
-
-| # | Screen Title | Route | Description |
-|---|---|---|---|
-| 1 | **Landing Page** | `/` | Pipeline visualizer, feature breakdown, and quick access |
-| 2 | **Authentication** | `/login` | Secure sign in / sign up + 1-click demo guest login |
-| 3 | **Dashboard** | `/dashboard` | Quick search bar, statistics, recent memories, upcoming reminders |
-| 4 | **Add Memory** | `/add` | Document upload, screenshot preview, notes, Gemini auto-fill & vision |
-| 5 | **Ask Memory** | `/ask` | Grounded RAG chat, citation inspector, conflict detection alert |
-| 6 | **Memory Library** | `/memories` | Full-text search across titles and contents, filters, favorites |
-| 7 | **Memory Detail** | `/memories/:id` | Full content viewer, metadata, Gemini AI summary, inline editing |
-| 8 | **Timeline** | `/timeline` | Chronological grouping of memories by month and year |
-| 9 | **Reminders** | `/reminders` | Upcoming deadlines, AI scanning from memories, completed toggle |
-| 10 | **Settings** | `/settings` | Gemini API key configuration, live test ping, model selector, demo data reset |
-
----
-
-## 🛠 Tech Stack
-- **Framework**: React 18 + Vite
-- **Language**: TypeScript
-- **Styling**: Tailwind CSS (Tailored dark mode, glowing accents, glassmorphic panels)
-- **Icons**: Lucide React + Material Symbols
-- **AI SDK**: Google Gemini API (`@google/genai` + Direct Browser REST fallback)
-- **Database / Auth**: Local encrypted storage (Default) + Supabase support
+See [the baseline audit](audit/PROJECT_AUDIT.md) and [current remediation notes](audit/REMEDIATION.md).

@@ -1,74 +1,33 @@
-/**
- * Client-side IndexedDB key-value store for large file attachments and screenshot data URLs.
- * Bypasses browser localStorage 5MB quota and persists gigabytes of screenshot/file data reliably.
- */
-
 const DB_NAME = 'memory_ai_blobs_db';
 const STORE_NAME = 'file_blobs';
-const DB_VERSION = 1;
-
-function openDB(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    if (typeof window === 'undefined' || !window.indexedDB) {
-      reject(new Error('IndexedDB not supported in this environment'));
-      return;
-    }
-
-    const request = window.indexedDB.open(DB_NAME, DB_VERSION);
-
-    request.onupgradeneeded = () => {
-      const db = request.result;
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME);
-      }
-    };
-
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
+async function transaction<T>(mode: IDBTransactionMode, action: (store:IDBObjectStore)=>IDBRequest<T>): Promise<T> {
+  const db = await new Promise<IDBDatabase>((resolve,reject)=>{
+    const request=indexedDB.open(DB_NAME,1);
+    request.onupgradeneeded=()=>{if(!request.result.objectStoreNames.contains(STORE_NAME))request.result.createObjectStore(STORE_NAME);};
+    request.onsuccess=()=>resolve(request.result); request.onerror=()=>reject(request.error); request.onblocked=()=>reject(new Error('Close other Memory AI tabs and try again.'));
+  });
+  return new Promise<T>((resolve,reject)=>{
+    const tx=db.transaction(STORE_NAME,mode); let request:IDBRequest<T>;
+    try {request=action(tx.objectStore(STORE_NAME));}catch(error){tx.abort();db.close();reject(error);return;}
+    tx.oncomplete=()=>{db.close();resolve(request.result);};
+    tx.onabort=tx.onerror=()=>{db.close();reject(tx.error || request.error || new Error('Attachment transaction failed.'));};
   });
 }
-
-export async function saveImageToIndexedDB(key: string, dataUrl: string): Promise<void> {
-  try {
-    const db = await openDB();
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(STORE_NAME, 'readwrite');
-      const store = tx.objectStore(STORE_NAME);
-      const req = store.put(dataUrl, key);
-      req.onsuccess = () => resolve();
-      req.onerror = () => reject(req.error);
-    });
-  } catch (err) {
-    console.warn('IndexedDB save notice:', err);
-  }
+export async function saveImageToIndexedDB(key:string,data:string|Blob):Promise<void> {await transaction('readwrite',s=>s.put(data,key));}
+export async function getImageFromIndexedDB(key:string):Promise<string|null> {
+  const data=await transaction<Blob|string|undefined>('readonly',s=>s.get(key));
+  if(!data)return null; if(typeof data==='string')return data;
+  return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result as string);reader.onerror=()=>reject(reader.error);reader.readAsDataURL(data);});
 }
-
-export async function getImageFromIndexedDB(key: string): Promise<string | null> {
-  try {
-    const db = await openDB();
-    return new Promise((resolve) => {
-      const tx = db.transaction(STORE_NAME, 'readonly');
-      const store = tx.objectStore(STORE_NAME);
-      const req = store.get(key);
-      req.onsuccess = () => resolve(req.result || null);
-      req.onerror = () => resolve(null);
-    });
-  } catch {
-    return null;
-  }
+export async function deleteImageFromIndexedDB(key:string):Promise<void> {await transaction('readwrite',s=>s.delete(key));}
+export async function writeValuesToIndexedDB(values:Record<string,string|Blob|null>):Promise<void> {
+  await transaction('readwrite',store=>{let last:IDBRequest=store.count();for(const [key,value] of Object.entries(values))last=value===null?store.delete(key):store.put(value,key);return last;});
 }
-
-export async function deleteImageFromIndexedDB(key: string): Promise<void> {
-  try {
-    const db = await openDB();
-    return new Promise((resolve) => {
-      const tx = db.transaction(STORE_NAME, 'readwrite');
-      const store = tx.objectStore(STORE_NAME);
-      const req = store.delete(key);
-      req.onsuccess = () => resolve();
-      req.onerror = () => resolve();
-    });
-  } catch {
-    // ignore
-  }
+export async function resetDemoStorage():Promise<void> {
+  await transaction('readwrite',store=>{
+    const request=store.openCursor();request.onsuccess=()=>{const cursor=request.result;if(cursor){if(String(cursor.key).startsWith('demo:'))cursor.delete();cursor.continue();}else{for(const name of ['memories','reminders','conversations'])store.put('[]',`demo:${name}`);}};return request;
+  });
+}
+export async function clearDemoAttachments():Promise<void> {
+  await transaction('readwrite',store=>{const request=store.openCursor(); request.onsuccess=()=>{const c=request.result;if(c){if(String(c.key).startsWith('demo:'))c.delete();c.continue();}};return request;});
 }

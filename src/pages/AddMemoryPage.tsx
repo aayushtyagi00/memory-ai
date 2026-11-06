@@ -1,3 +1,4 @@
+import {fileType} from '../../shared/contracts';
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
@@ -82,21 +83,12 @@ export const AddMemoryPage: React.FC = () => {
     };
   }, [previewUrl]);
 
-  const ALLOWED_EXTENSIONS = ['.pdf', '.txt', '.md', '.png', '.jpg', '.jpeg', '.webp', '.doc', '.docx', '.csv', '.json', '.xlsx'];
+  const ALLOWED_EXTENSIONS = ['.pdf', '.txt', '.md', '.png', '.jpg', '.jpeg', '.webp', '.docx', '.csv', '.json', '.xlsx'];
 
   // Single File Selection
   const handleSingleFileChange = async (file: File) => {
-    const ext = '.' + file.name.split('.').pop()?.toLowerCase();
-    if (!ALLOWED_EXTENSIONS.includes(ext)) {
-      setErrorMessage(`Unsupported file format (${ext}). Supported formats: PDF, Word (DOCX), Text, Markdown, CSV, JSON, and Images (PNG, JPG, WEBP).`);
-      return;
-    }
-
-    if (file.size > 20 * 1024 * 1024) {
-      setErrorMessage('File size exceeds 20 MB limit');
-      return;
-    }
-
+    if (uploadStatus === 'uploading' || uploadStatus === 'processing') return;
+    try {fileType(file);} catch(error) {setErrorMessage(error instanceof Error ? error.message : 'Invalid file');return;}
     if (previewUrl) {
       URL.revokeObjectURL(previewUrl);
     }
@@ -113,9 +105,7 @@ export const AddMemoryPage: React.FC = () => {
       setPreviewUrl(url);
 
       // If Gemini is active, run automatic vision analysis
-      if (hasApiKey) {
-        handleVisionExtract(file);
-      }
+      // Extraction is awaited once during submission, tied to this file.
     } else {
       setPreviewUrl(null);
     }
@@ -123,7 +113,9 @@ export const AddMemoryPage: React.FC = () => {
 
   // Multiple / Batch File Selection
   const handleFilesSelected = (files: FileList | File[]) => {
+    if(isBatchProcessing || uploadStatus==='uploading'||uploadStatus==='processing')return;
     const fileList = Array.from(files);
+    try {fileList.forEach(file=>fileType(file));}catch(error){setErrorMessage(error instanceof Error?error.message:'Invalid file');return;}
     if (fileList.length === 0) return;
 
     if (fileList.length === 1) {
@@ -244,31 +236,8 @@ export const AddMemoryPage: React.FC = () => {
     setErrorMessage(null);
 
     try {
-      const progressTimer = setInterval(() => {
-        setUploadProgress((prev) => {
-          if (prev >= 85) {
-            clearInterval(progressTimer);
-            return 85;
-          }
-          return prev + 15;
-        });
-      }, 250);
-
-      setTimeout(() => {
-        setUploadStatus('processing');
-      }, 600);
-
-      let textToUse = visionExtractedText || undefined;
-      // If user submitted while OCR was in-flight, await brief completion
-      if (!textToUse && selectedFile.type.startsWith('image/') && hasApiKey && visionExtracting) {
-        let attempts = 0;
-        while (visionExtracting && attempts < 8) {
-          await new Promise((r) => setTimeout(r, 400));
-          attempts++;
-        }
-        textToUse = visionExtractedText || undefined;
-      }
-
+      setUploadStatus('processing');
+      const textToUse = undefined;
       const mem = await api.uploadMemory(
         selectedFile,
         fileTitle,
@@ -277,9 +246,10 @@ export const AddMemoryPage: React.FC = () => {
         textToUse
       );
 
-      clearInterval(progressTimer);
+
       setUploadProgress(100);
-      setUploadStatus('ready');
+      setUploadStatus(mem.indexing_status==='ready'?'ready':'failed');
+      if(mem.indexing_status!=='ready')setErrorMessage(mem.indexing_error||'Original saved, but text extraction failed. Open the memory to retry.');
 
       // If user detected reminder, save it
       if (detectedReminder && createReminderChecked) {
@@ -306,6 +276,7 @@ export const AddMemoryPage: React.FC = () => {
     setIsBatchProcessing(true);
     setErrorMessage(null);
 
+    let failures = 0;
     for (let i = 0; i < batchQueue.length; i++) {
       setBatchIndex(i);
       const item = batchQueue[i];
@@ -315,34 +286,14 @@ export const AddMemoryPage: React.FC = () => {
       );
 
       try {
-        let extractedText: string | undefined = undefined;
-        let title = item.title;
-        let category = item.category;
-        let tags = item.tags;
-
-        const isImage = item.file.type.startsWith('image/') || /\.(png|jpe?g|webp|gif|bmp|tiff|heic)$/i.test(item.file.name);
-        if (isImage && hasApiKey) {
-          try {
-            setBatchQueue((prev) =>
-              prev.map((q, idx) => (idx === i ? { ...q, status: 'extracting' } : q))
-            );
-            const visionResult = await geminiService.extractTextFromImage(item.file);
-            extractedText = visionResult.extractedText;
-            if (visionResult.title) title = visionResult.title;
-            if (visionResult.category) category = visionResult.category;
-            if (visionResult.tags && visionResult.tags.length > 0) {
-              tags = Array.from(new Set([...tags, ...visionResult.tags]));
-            }
-          } catch (vErr) {
-            console.warn('Batch OCR extraction notice for', item.file.name, vErr);
-          }
-        }
-
-        await api.uploadMemory(item.file, title, category, tags, extractedText);
+        const title=item.title;
+        const memory=await api.uploadMemory(item.file,title,item.category,item.tags);
+        if(memory.indexing_status!=='ready')throw new Error(memory.indexing_error||'Original retained; extraction failed. Open the memory to retry.');
         setBatchQueue((prev) =>
           prev.map((q, idx) => (idx === i ? { ...q, status: 'done', title } : q))
         );
       } catch (err: any) {
+        failures++;
         setBatchQueue((prev) =>
           prev.map((q, idx) => (idx === i ? { ...q, status: 'failed', error: err?.message || 'Failed' } : q))
         );
@@ -350,9 +301,7 @@ export const AddMemoryPage: React.FC = () => {
     }
 
     setIsBatchProcessing(false);
-    setTimeout(() => {
-      navigate('/memories');
-    }, 1200);
+    if(!failures)navigate('/memories');else setErrorMessage(`${failures} file(s) need attention. Originals retained after extraction failure are visible in the library.`);
   };
 
   // Submit Note
@@ -388,7 +337,7 @@ export const AddMemoryPage: React.FC = () => {
       <div>
         <h1 className="text-xl sm:text-2xl font-bold text-text-primary">Add Memory</h1>
         <p className="text-xs text-text-secondary mt-1">
-          Store documents, screenshots or notes into your grounded Gemini personal memory library.
+          Save originals and searchable text in your memory library. Files are limited to 15 MB.
         </p>
       </div>
 
@@ -561,7 +510,7 @@ export const AddMemoryPage: React.FC = () => {
           ) : (
             <>
               {/* Drag and drop zone */}
-              <div
+              <div role="button" tabIndex={0} onKeyDown={event=>{if(event.target===event.currentTarget&&(event.key==='Enter'||event.key===' ')){event.preventDefault();event.currentTarget.click();}}}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={handleDrop}
                 onClick={() => fileInputRef.current?.click()}
@@ -576,7 +525,7 @@ export const AddMemoryPage: React.FC = () => {
                   type="file"
                   multiple
                   onChange={(e) => e.target.files && handleFilesSelected(e.target.files)}
-                  accept=".pdf,.txt,.md,.png,.jpg,.jpeg,.webp,.doc,.docx"
+                  accept=".pdf,.txt,.md,.csv,.json,.xlsx,.png,.jpg,.jpeg,.webp,.docx"
                   className="hidden"
                 />
 
@@ -639,8 +588,8 @@ export const AddMemoryPage: React.FC = () => {
               <div className="p-6 rounded-2xl bg-bg-elevated border border-border flex flex-col gap-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="text-xs font-medium text-text-secondary block mb-1">Title</label>
-                    <input
+                    <label htmlFor="AddMemoryPage-field-591" className="text-xs font-medium text-text-secondary block mb-1">Title</label>
+                    <input id="AddMemoryPage-field-591"
                       type="text"
                       value={fileTitle}
                       onChange={(e) => setFileTitle(e.target.value)}
@@ -650,8 +599,8 @@ export const AddMemoryPage: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="text-xs font-medium text-text-secondary block mb-1">Category</label>
-                    <select
+                    <label htmlFor="AddMemoryPage-field-602" className="text-xs font-medium text-text-secondary block mb-1">Category</label>
+                    <select id="AddMemoryPage-field-602"
                       value={fileCategory}
                       onChange={(e) => setFileCategory(e.target.value)}
                       className="w-full bg-bg-base border border-border rounded-xl px-3.5 py-2.5 text-xs text-text-primary focus:outline-none focus:border-accent"
@@ -667,7 +616,7 @@ export const AddMemoryPage: React.FC = () => {
 
                 {/* Tags Input */}
                 <div>
-                  <label className="text-xs font-medium text-text-secondary block mb-1">Tags</label>
+                  <label htmlFor="AddMemoryPage-field-637" className="text-xs font-medium text-text-secondary block mb-1">Tags</label>
                   <div className="flex flex-wrap items-center gap-1.5 mb-2">
                     {fileTags.map((t) => (
                       <span
@@ -686,7 +635,7 @@ export const AddMemoryPage: React.FC = () => {
                     ))}
                   </div>
                   <div className="flex gap-2">
-                    <input
+                    <input id="AddMemoryPage-field-637"
                       type="text"
                       value={tagInput}
                       onChange={(e) => setTagInput(e.target.value)}
@@ -770,8 +719,8 @@ export const AddMemoryPage: React.FC = () => {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="text-xs font-medium text-text-secondary block mb-1">Title</label>
-                <input
+                <label htmlFor="AddMemoryPage-field-722" className="text-xs font-medium text-text-secondary block mb-1">Title</label>
+                <input id="AddMemoryPage-field-722"
                   type="text"
                   value={noteTitle}
                   onChange={(e) => setNoteTitle(e.target.value)}
@@ -781,8 +730,8 @@ export const AddMemoryPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="text-xs font-medium text-text-secondary block mb-1">Category</label>
-                <select
+                <label htmlFor="AddMemoryPage-field-733" className="text-xs font-medium text-text-secondary block mb-1">Category</label>
+                <select id="AddMemoryPage-field-733"
                   value={noteCategory}
                   onChange={(e) => setNoteCategory(e.target.value)}
                   className="w-full bg-bg-base border border-border rounded-xl px-3.5 py-2.5 text-xs text-text-primary focus:outline-none focus:border-accent"
@@ -798,11 +747,11 @@ export const AddMemoryPage: React.FC = () => {
 
             {/* Note Content */}
             <div>
-              <label className="text-xs font-medium text-text-secondary block mb-1">Content</label>
-              <textarea
+              <label htmlFor="AddMemoryPage-field-750" className="text-xs font-medium text-text-secondary block mb-1">Content</label>
+              <textarea id="AddMemoryPage-field-750"
                 rows={8}
                 value={noteContent}
-                onChange={(e) => setNoteContent(e.target.value)}
+                disabled={isAnalyzing} onChange={(e) => {setNoteContent(e.target.value);setDetectedReminder(null);}}
                 placeholder="Write your personal notes, meeting guidance, instructions or notes here..."
                 className="w-full bg-bg-base border border-border rounded-xl p-3.5 text-xs text-text-primary focus:outline-none focus:border-accent leading-relaxed resize-y font-mono"
               />
@@ -810,7 +759,7 @@ export const AddMemoryPage: React.FC = () => {
 
             {/* Tags Input */}
             <div>
-              <label className="text-xs font-medium text-text-secondary block mb-1">Tags</label>
+              <label htmlFor="AddMemoryPage-field-780" className="text-xs font-medium text-text-secondary block mb-1">Tags</label>
               <div className="flex flex-wrap items-center gap-1.5 mb-2">
                 {noteTags.map((t) => (
                   <span
@@ -829,7 +778,7 @@ export const AddMemoryPage: React.FC = () => {
                 ))}
               </div>
               <div className="flex gap-2">
-                <input
+                <input id="AddMemoryPage-field-780"
                   type="text"
                   value={noteTagInput}
                   onChange={(e) => setNoteTagInput(e.target.value)}
@@ -867,8 +816,8 @@ export const AddMemoryPage: React.FC = () => {
                   </div>
                 </div>
 
-                <label className="flex items-center gap-2 cursor-pointer shrink-0 font-mono text-[11px] text-text-primary">
-                  <input
+                <label htmlFor="AddMemoryPage-field-819" className="flex items-center gap-2 cursor-pointer shrink-0 font-mono text-[11px] text-text-primary">
+                  <input id="AddMemoryPage-field-819"
                     type="checkbox"
                     checked={createReminderChecked}
                     onChange={(e) => setCreateReminderChecked(e.target.checked)}

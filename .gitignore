@@ -45,3 +45,21 @@ Thumbs.db
 
 # Gemini / Antigravity temporary directories
 .system_generated/
+
+# Local validation output
+test-results/
+playwright-report/
+*.tsbuildinfo
+
+# Deployment account links and local Supabase state
+.vercel/
+supabase/.temp/
+supabase/.branches/
+
+# Generated local audit snapshots and validation logs
+audit/build-output.txt
+audit/current-file-review.json
+audit/file-inventory.json
+audit/reproduction-results.json
+audit/publish-paths.json
+audit/BASELINE_FILE_REVIEW.md

@@ -36,10 +36,10 @@ export const LandingPage: React.FC = () => {
     }
   };
 
-  const handleExploreDemo = (e: React.MouseEvent) => {
+  const handleExploreDemo = async (e: React.MouseEvent) => {
     e.preventDefault();
     if (!user) {
-      enableDemoUser();
+      await enableDemoUser();
     }
     navigate('/ask');
   };
@@ -102,7 +102,7 @@ export const LandingPage: React.FC = () => {
                   THE RETRIEVAL PIPELINE
                 </span>
                 <h3 className="text-sm font-medium text-text-primary mt-0.5">
-                  How MEMORY AI Grounds Every Single Answer
+                  How MEMORY AI Finds Source Evidence
                 </h3>
               </div>
               <span className="hidden sm:inline-flex items-center gap-1.5 font-mono text-xs text-text-muted bg-bg-base px-2.5 py-1 rounded-md border border-border">
@@ -127,8 +127,8 @@ export const LandingPage: React.FC = () => {
                   <Cpu className="w-5 h-5" />
                 </div>
                 <span className="font-mono text-[11px] text-text-muted mb-1">02. INDEX</span>
-                <h4 className="text-xs font-semibold text-text-primary">File Search Store</h4>
-                <p className="text-[11px] text-text-secondary mt-1">Multimodal embedding-2 indexes vectors</p>
+                <h4 className="text-xs font-semibold text-text-primary">Searchable Text</h4>
+                <p className="text-[11px] text-text-secondary mt-1">Text extraction and database search</p>
               </div>
 
               {/* Step 3 */}
@@ -148,7 +148,7 @@ export const LandingPage: React.FC = () => {
                 </div>
                 <span className="font-mono text-[11px] text-text-muted mb-1">04. GROUND</span>
                 <h4 className="text-xs font-semibold text-text-primary">Grounded Answer</h4>
-                <p className="text-[11px] text-text-secondary mt-1">Gemini synthesizes ONLY from retrieved facts</p>
+                <p className="text-[11px] text-text-secondary mt-1">AI summarizes selected source excerpts</p>
               </div>
 
               {/* Step 5 */}
@@ -158,7 +158,7 @@ export const LandingPage: React.FC = () => {
                 </div>
                 <span className="font-mono text-[11px] text-text-muted mb-1">05. VERIFY</span>
                 <h4 className="text-xs font-semibold text-text-primary">Source Evidence</h4>
-                <p className="text-[11px] text-text-secondary mt-1">Exact file citations &amp; verified snippets</p>
+                <p className="text-[11px] text-text-secondary mt-1">Source citations with matching excerpts</p>
               </div>
             </div>
           </div>
@@ -179,9 +179,9 @@ export const LandingPage: React.FC = () => {
                 <div className="w-10 h-10 rounded-xl bg-accent-soft border border-accent/20 flex items-center justify-center text-accent mb-4">
                   <Shield className="w-5 h-5" />
                 </div>
-                <h3 className="text-base font-semibold text-text-primary mb-2">Zero Hallucinations Policy</h3>
+                <h3 className="text-base font-semibold text-text-primary mb-2">Evidence-based Answers</h3>
                 <p className="text-xs text-text-secondary leading-relaxed">
-                  If your memories don't contain the answer, Memory AI explicitly replies: <span className="font-mono text-primary font-medium">"I couldn't find this information in your memories."</span> No fabricated claims.
+                  If your memories don't contain the answer, Memory AI explicitly replies: <span className="font-mono text-primary font-medium">"I couldn't find this information in your memories."</span> Review cited text before relying on an AI answer.
                 </p>
               </div>
 
@@ -189,9 +189,9 @@ export const LandingPage: React.FC = () => {
                 <div className="w-10 h-10 rounded-xl bg-accent-soft border border-accent/20 flex items-center justify-center text-accent mb-4">
                   <ImageIcon className="w-5 h-5" />
                 </div>
-                <h3 className="text-base font-semibold text-text-primary mb-2">Native Screenshot Search</h3>
+                <h3 className="text-base font-semibold text-text-primary mb-2">Screenshot Text Search</h3>
                 <p className="text-xs text-text-secondary leading-relaxed">
-                  Powered by <span className="font-mono text-primary">models/gemini-embedding-2</span>, screenshot receipts, whiteboards, and handwritten notes are embedded natively and searchable without messy OCR.
+                  AI transcription extracts text from receipts, screenshots, and scanned PDFs for searchable memories. Check OCR results against the original.
                 </p>
               </div>
 

@@ -52,7 +52,7 @@ export class ErrorBoundary extends Component<Props, State> {
             <div className="space-y-1">
               <h2 className="text-base font-bold text-text-primary">Something went wrong</h2>
               <p className="text-xs text-text-secondary">
-                An unexpected interface error occurred. Your stored memories and data are secure in your vault.
+                An unexpected interface error occurred. Reload the page to retry. If a save was interrupted, check that it completed.
               </p>
             </div>
 

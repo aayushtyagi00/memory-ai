@@ -1,0 +1,22 @@
+project_id = "memory-ai"
+[auth]
+site_url = "http://localhost:5173"
+additional_redirect_urls = ["http://localhost:5173/dashboard", "http://localhost:5173/reset-password"]
+minimum_password_length = 12
+[functions.ai]
+verify_jwt = true
+[functions.ask-memory]
+verify_jwt = true
+[functions.create-note]
+verify_jwt = true
+[functions.delete-memory]
+verify_jwt = true
+[functions.manage-memory]
+verify_jwt = true
+[functions.upload-memory]
+verify_jwt = true
+[functions.load-demo-data]
+verify_jwt = true
+[functions.dispatch-reminders]
+# This scheduled endpoint authenticates its own high-entropy x-reminder-secret header.
+verify_jwt = false

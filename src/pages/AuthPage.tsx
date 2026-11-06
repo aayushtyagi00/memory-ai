@@ -1,7 +1,9 @@
+import {Dialog} from '../components/common/Dialog';
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
+  Home, ShieldCheck, Eye, EyeOff,
   X,
   KeyRound,
   CheckCircle2,
@@ -9,8 +11,7 @@ import {
   ArrowRight,
 } from 'lucide-react';
 
-const MEMORY_LOGO_URL =
-  'https://lh3.googleusercontent.com/aida/AEtjO1VpGfiThLWaMOO76r99e6YbUWRnJEOe6YlDPypWtK-Gao8T7h_k7ZPedGLfMS2NsdL6Bo8tb1ep1vNlrOfDP9BBdqlcECMH3wUOdx02ltdkgmSv0FPzA_NQUwLh-7hDdHQapkqWKzZWPuxoytCGBCxYcdAY2kD4Bbopewb8c-j7NSmT5UQwch9CwwLJ6YlBm1umSixQ_AQ4yqTOvDOhywfMtqlMgmNKn4JtZksiMk70HbdwzZV-urmbDBEX';
+const MEMORY_LOGO_URL = '/logo.svg';
 
 export const AuthPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -35,7 +36,7 @@ export const AuthPage: React.FC = () => {
   const [resetLoading, setResetLoading] = useState(false);
   const [resetMessage, setResetMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  const { signIn, signUp, signInWithGoogle, user, resetPassword } = useAuth();
+  const { signIn, signUp, signInWithGoogle, user, resetPassword, enableDemoUser } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -148,7 +149,7 @@ export const AuthPage: React.FC = () => {
               to="/"
               className="text-xs font-medium text-text-secondary hover:text-text-primary px-3.5 py-1.5 rounded-lg border border-border bg-bg-elevated/60 hover:bg-bg-hover transition-all flex items-center gap-1.5"
             >
-              <span className="material-symbols-outlined text-[16px]">home</span>
+              <Home aria-hidden="true" className="w-4 h-4" />
               <span>Home</span>
             </Link>
           </div>
@@ -188,7 +189,7 @@ export const AuthPage: React.FC = () => {
                     <span className="text-text-secondary">searchable memory.</span>
                   </h1>
                   <p className="text-xs sm:text-sm text-text-secondary max-w-md leading-relaxed">
-                    Upload documents, notes, and screenshots. Query them with verified citations and zero data leakage.
+                    Upload documents, notes, and screenshots. Search saved text with source excerpts. AI processing sends selected content to Google.
                   </p>
                 </div>
 
@@ -224,7 +225,7 @@ export const AuthPage: React.FC = () => {
                           AI INDEXES
                         </span>
                         <span className="text-xs text-text-secondary">
-                          Gemini File Search &amp; deterministic chunking
+                          Memory Storage &amp; deterministic chunking
                         </span>
                       </div>
                     </div>
@@ -248,7 +249,7 @@ export const AuthPage: React.FC = () => {
                           GROUNDED RECALL
                         </span>
                         <span className="text-xs text-text-secondary">
-                          Strict evidence citations with page-level inspection
+                          Source excerpts linked to the saved memory
                         </span>
                       </div>
                     </div>
@@ -259,9 +260,9 @@ export const AuthPage: React.FC = () => {
               {/* Security / Protocol Badge at Bottom */}
               <div className="relative z-10 pt-6 mt-6 border-t border-border/60">
                 <div className="flex items-center gap-2 text-text-muted">
-                  <span className="material-symbols-outlined text-[16px] text-accent">verified_user</span>
+                  <ShieldCheck aria-hidden="true" className="w-4 h-4 text-accent" />
                   <span className="font-mono text-[11px] tracking-wide">
-                    ENCRYPTION: 256-BIT AES · ROW-LEVEL SECURITY ENFORCED
+                    CLOUD: AUTHENTICATED ACCESS · DEMO: LOCAL BROWSER STORAGE
                   </span>
                 </div>
               </div>
@@ -275,6 +276,7 @@ export const AuthPage: React.FC = () => {
               {/* Auth Container Box */}
               <div className="relative z-10 w-full max-w-sm p-6 sm:p-8 rounded-2xl bg-bg-elevated border border-border shadow-2xl flex flex-col gap-4">
                 
+                <button type="button" className="border border-border rounded p-3 text-sm" onClick={async()=>{await enableDemoUser();navigate('/dashboard');}}>Open local demo (no account)</button>
                 {/* Segmented Toggle */}
                 <div className="w-full grid grid-cols-2 p-1 bg-bg-base rounded-xl border border-border">
                   <button
@@ -397,9 +399,7 @@ export const AuthPage: React.FC = () => {
                         onClick={() => setShowPassword(!showPassword)}
                         className="absolute right-3 p-1 text-text-muted hover:text-text-primary flex items-center justify-center transition-colors cursor-pointer"
                       >
-                        <span className="material-symbols-outlined text-[18px]" id="eye-icon">
-                          {showPassword ? 'visibility_off' : 'visibility'}
-                        </span>
+                        {showPassword ? <EyeOff aria-hidden="true" className="w-4 h-4" /> : <Eye aria-hidden="true" className="w-4 h-4" />}
                       </button>
                     </div>
                   </div>
@@ -407,7 +407,7 @@ export const AuthPage: React.FC = () => {
                   {/* Inline error alert */}
                   {error && (
                     <div className="flex items-center gap-1.5 text-accent text-xs bg-accent-soft/40 px-3 py-2 rounded-lg border border-accent/20 animate-fadeIn">
-                      <span className="material-symbols-outlined text-[16px] shrink-0">error</span>
+                      <AlertCircle aria-hidden="true" className="w-4 h-4 shrink-0" />
                       <span>{error}</span>
                     </div>
                   )}
@@ -433,7 +433,7 @@ export const AuthPage: React.FC = () => {
                         <span id="submit-text">
                           {isSignUp ? 'Initialize Memory Space' : 'Continue to Your Memory'}
                         </span>
-                        <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+                        <ArrowRight aria-hidden="true" className="w-4 h-4" />
                       </>
                     )}
                   </button>
@@ -509,7 +509,7 @@ export const AuthPage: React.FC = () => {
 
       {/* Forgot Password Modal */}
       {forgotPasswordOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <Dialog label="Password recovery" onClose={()=>setForgotPasswordOpen(false)}>
           <div className="p-6 rounded-2xl bg-bg-elevated border border-border max-w-md w-full flex flex-col gap-4 shadow-2xl relative">
             <button
               onClick={() => setForgotPasswordOpen(false)}
@@ -546,8 +546,8 @@ export const AuthPage: React.FC = () => {
 
             <form onSubmit={handleResetPassword} className="flex flex-col gap-3">
               <div>
-                <label className="block text-xs font-mono text-text-secondary mb-1">Email</label>
-                <input
+                <label htmlFor="AuthPage-field-550" className="block text-xs font-mono text-text-secondary mb-1">Email</label>
+                <input id="AuthPage-field-550"
                   type="email"
                   required
                   value={resetEmail}
@@ -575,17 +575,17 @@ export const AuthPage: React.FC = () => {
               </div>
             </form>
           </div>
-        </div>
+        </Dialog>
       )}
 
       {/* Footer */}
       <footer className="w-full bg-bg-base py-4 border-t border-border">
         <div className="max-w-[1200px] mx-auto px-4 md:px-8 flex flex-col sm:flex-row items-center justify-between gap-2 text-text-muted font-mono text-[11px]">
-          <span>© 2025 MEMORY AI INC. ALL RIGHTS RESERVED.</span>
+          <span>MEMORY AI — PERSONAL MEMORY LIBRARY</span>
           <div className="flex items-center gap-4">
             <span>GROUNDED RETRIEVAL PROTOCOL</span>
             <span className="w-1.5 h-1.5 rounded-full bg-success inline-block" />
-            <span>ENCRYPTED LAYER</span>
+            <span>AUTHENTICATED CLOUD ACCESS</span>
           </div>
         </div>
       </footer>

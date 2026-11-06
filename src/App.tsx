@@ -1,18 +1,20 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { AppLayout } from './components/layout/AppLayout';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
-import { LandingPage } from './pages/LandingPage';
-import { AuthPage } from './pages/AuthPage';
-import { DashboardPage } from './pages/DashboardPage';
-import { AddMemoryPage } from './pages/AddMemoryPage';
-import { AskMemoryPage } from './pages/AskMemoryPage';
-import { MemoryLibraryPage } from './pages/MemoryLibraryPage';
-import { MemoryDetailPage } from './pages/MemoryDetailPage';
-import { TimelinePage } from './pages/TimelinePage';
-import { RemindersPage } from './pages/RemindersPage';
-import { SettingsPage } from './pages/SettingsPage';
+const LandingPage=lazy(()=>import('./pages/LandingPage').then(module=>({default:module.LandingPage})));
+const AuthPage=lazy(()=>import('./pages/AuthPage').then(module=>({default:module.AuthPage})));
+const DashboardPage=lazy(()=>import('./pages/DashboardPage').then(module=>({default:module.DashboardPage})));
+const AddMemoryPage=lazy(()=>import('./pages/AddMemoryPage').then(module=>({default:module.AddMemoryPage})));
+const AskMemoryPage=lazy(()=>import('./pages/AskMemoryPage').then(module=>({default:module.AskMemoryPage})));
+const MemoryLibraryPage=lazy(()=>import('./pages/MemoryLibraryPage').then(module=>({default:module.MemoryLibraryPage})));
+const MemoryDetailPage=lazy(()=>import('./pages/MemoryDetailPage').then(module=>({default:module.MemoryDetailPage})));
+const TimelinePage=lazy(()=>import('./pages/TimelinePage').then(module=>({default:module.TimelinePage})));
+const RemindersPage=lazy(()=>import('./pages/RemindersPage').then(module=>({default:module.RemindersPage})));
+const SettingsPage=lazy(()=>import('./pages/SettingsPage').then(module=>({default:module.SettingsPage})));
+const ResetPasswordPage=lazy(()=>import('./pages/ResetPasswordPage').then(module=>({default:module.ResetPasswordPage})));
+import { Feedback } from './components/common/Feedback';
 
 // Automatically redirects authenticated users away from public landing/login pages to /dashboard
 const AuthRedirectWatcher: React.FC = () => {
@@ -47,7 +49,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
     return <Navigate to="/login" replace />;
   }
 
-  return <>{children}</>;
+  return <React.Fragment key={user?.id}>{children}</React.Fragment>;
 };
 
 // Route wrapper for public/guest pages - if already authenticated, redirects directly to /dashboard
@@ -74,8 +76,11 @@ export const App: React.FC = () => {
     <ErrorBoundary>
       <AuthProvider>
         <BrowserRouter>
+          <Feedback />
           <AuthRedirectWatcher />
+          <Suspense fallback={<p className="p-8" role="status">Loading page…</p>}>
           <Routes>
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
             {/* Public Routes: authenticated users are directly sent to /dashboard */}
             <Route
               path="/"
@@ -115,6 +120,7 @@ export const App: React.FC = () => {
             {/* Catch-all */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          </Suspense>
         </BrowserRouter>
       </AuthProvider>
     </ErrorBoundary>

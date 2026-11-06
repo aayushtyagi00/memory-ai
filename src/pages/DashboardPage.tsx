@@ -1,3 +1,4 @@
+import {reportError} from '../components/common/Feedback';
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -49,9 +50,9 @@ export const DashboardPage: React.FC = () => {
       ]);
       setStats(s);
       setRecentMemories(memories.slice(0, 6));
-      setUpcomingReminders(reminders.filter((r) => r.status === 'pending').slice(0, 4));
+      setUpcomingReminders(reminders.filter((r) => r.status === 'pending' && r.due_at && Date.parse(r.due_at)>=Date.now()).sort((a,b)=>Date.parse(a.due_at!)-Date.parse(b.due_at!)).slice(0, 4));
     } catch (err) {
-      console.error('Error loading dashboard data:', err);
+      reportError(err);
     } finally {
       setLoading(false);
     }
@@ -97,7 +98,7 @@ export const DashboardPage: React.FC = () => {
             )}
           </div>
           <p className="text-xs text-text-secondary mt-1">
-            Your personal memories are indexed and ready for grounded question answering.
+            Your saved memories, searchable text, and upcoming reminders.
           </p>
         </div>
 
@@ -125,7 +126,7 @@ export const DashboardPage: React.FC = () => {
 
         <div className="relative z-10 max-w-2xl">
           <span className="font-mono text-[10px] text-accent font-semibold tracking-wider uppercase">
-            {hasApiKey ? 'POWERED BY GOOGLE GEMINI 2.5 FLASH' : 'GROUNDED RETRIEVAL ENGINE'}
+            {hasApiKey ? 'AI CONNECTION CONFIGURED' : 'GROUNDED RETRIEVAL ENGINE'}
           </span>
           <h2 className="text-lg sm:text-xl font-bold text-text-primary mt-1 mb-3">
             What would you like to retrieve from your memory?
@@ -177,7 +178,7 @@ export const DashboardPage: React.FC = () => {
             <FolderArchive className="w-4 h-4 text-text-muted" />
           </div>
           <span className="text-2xl font-bold text-text-primary">{stats.total}</span>
-          <span className="text-[10px] font-mono text-success">Indexed in Store</span>
+          <span className="text-[10px] font-mono text-success">Saved Memories</span>
         </div>
 
         <div className="p-4 rounded-xl bg-bg-elevated border border-border flex flex-col gap-1">
@@ -204,7 +205,7 @@ export const DashboardPage: React.FC = () => {
             <ImageIcon className="w-4 h-4 text-amber-400" />
           </div>
           <span className="text-2xl font-bold text-text-primary">{stats.images}</span>
-          <span className="text-[10px] font-mono text-text-muted">Vision Extracted</span>
+          <span className="text-[10px] font-mono text-text-muted">Screenshots & Images</span>
         </div>
       </div>
 

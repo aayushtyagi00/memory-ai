@@ -526,9 +526,10 @@
 
     form.addEventListener('submit', (e) => {
       e.preventDefault();
-      const title = document.getElementById('modal-title').value;
-      const cat = document.getElementById('modal-category').value;
-      const src = document.getElementById('modal-source').value || 'unlinked_user_note.txt';
+      const escapeHTML = value => String(value).replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+      const title = escapeHTML(document.getElementById('modal-title').value);
+      const cat = escapeHTML(document.getElementById('modal-category').value);
+      const src = escapeHTML(document.getElementById('modal-source').value || 'unlinked_user_note.txt');
 
       const newCard = document.createElement('div');
       newCard.className = "reminder-card group flex flex-col xl:flex-row xl:items-center justify-between p-space-md gap-space-md rounded-xl bg-bg-elevated hover:bg-bg-hover transition-all duration-150 shadow-sm";

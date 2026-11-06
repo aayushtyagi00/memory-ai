@@ -1,1266 +1,143 @@
-import { getSupabaseClient, isSupabaseConfigured } from '../lib/supabase';
-import { Memory, Reminder, AskResponse, UserStats, Source, ChatConversation } from '../types';
+import { Memory, Reminder, AskResponse, UserStats, ChatConversation } from '../types';
 import { INITIAL_DEMO_MEMORIES, DEMO_REMINDERS, INITIAL_DEMO_CONVERSATIONS } from './demoData';
 import { geminiService } from './gemini';
-import { saveImageToIndexedDB, getImageFromIndexedDB, deleteImageFromIndexedDB } from '../utils/indexedDb';
+import { saveImageToIndexedDB, getImageFromIndexedDB, deleteImageFromIndexedDB, writeValuesToIndexedDB, resetDemoStorage } from '../utils/indexedDb';
+import { requireMode, getGeneration } from '../lib/storageMode';
+import { cloudClient, invoke } from './backend';
+import { extractDocument } from './documents';
+import { category as validCategory, tags as validTags, text, fileType, dueDate, STORAGE_LIMIT, MAX_CONTENT_CHARS, MAX_QUESTION_CHARS, validateSignature, NOT_FOUND, chunks } from '../../shared/contracts';
 
-const LOCAL_STORAGE_KEY = 'memory_ai_memories_v1';
-const LOCAL_REMINDERS_KEY = 'memory_ai_reminders_v1';
-const LOCAL_CONVERSATIONS_KEY = 'memory_ai_conversations_v1';
-
-function getLocalConversations(): ChatConversation[] {
-  try {
-    const data = localStorage.getItem(LOCAL_CONVERSATIONS_KEY);
-    if (!data) {
-      localStorage.setItem(LOCAL_CONVERSATIONS_KEY, JSON.stringify(INITIAL_DEMO_CONVERSATIONS));
-      return INITIAL_DEMO_CONVERSATIONS;
+export const USER_STORAGE_CAP_BYTES = STORAGE_LIMIT;
+export function formatStorageSize(bytes:number):string {if(!bytes||bytes<0)return '0 B';const units=['B','KB','MB','GB'];const p=Math.min(3,Math.floor(Math.log(bytes)/Math.log(1024)));return `${(bytes/1024**p).toFixed(p?2:0)} ${units[p]}`;}
+const clone=<T,>(value:T):T=>structuredClone(value);
+const localKey=(name:string)=>`demo:${name}`;
+async function read<T>(name:string,initial:T):Promise<T> {
+  if(requireMode().kind!=='demo')throw new Error('Local data is isolated from cloud accounts.');
+  const data=await getImageFromIndexedDB(localKey(name));
+  if(data===null)return clone(initial);
+  try {return JSON.parse(data) as T;} catch {throw new Error('Local data could not be read. Export a backup before making further changes.');}
+}
+async function write(name:string,data:unknown) {if(requireMode().kind!=='demo')throw new Error('Session changed. Please try again.');await saveImageToIndexedDB(localKey(name),JSON.stringify(data));}
+let mutation=Promise.resolve();
+async function localMutation<T>(action:()=>Promise<T>):Promise<T> {
+  const generation=getGeneration();
+  const run=async()=>{if(generation!==getGeneration()||requireMode().kind!=='demo')throw new Error('Session changed. Please try again.');return action();};
+  const task:Promise<T>=mutation.then(async()=>{if(typeof navigator!=='undefined'&&navigator.locks)return await navigator.locks.request('memory-ai-demo',async()=>await run());return await run();});
+  mutation=task.then(()=>{},()=>{});return task;
+}
+async function pages<T>(table:string,order='created_at'):Promise<T[]> {
+  const {client,userId}=cloudClient(); const result:T[]=[];
+  for(let start=0;;start+=500){const {data,error}=await client.from(table).select('*').eq('user_id',userId).order(order,{ascending:false}).order('id').range(start,start+499);if(error)throw error;result.push(...(data||[]) as T[]);if(!data||data.length<500)return result;}
+}
+const memories=()=>read<Memory[]>('memories',INITIAL_DEMO_MEMORIES);
+const reminders=()=>read<Reminder[]>('reminders',DEMO_REMINDERS);
+const conversations=()=>read<ChatConversation[]>('conversations',INITIAL_DEMO_CONVERSATIONS);
+function noteInput(title:string,content:string,category:string,tags:string[]) {return {title:text(title,'Title',200),content:text(content,'Content',MAX_CONTENT_CHARS),category:validCategory(category),tags:validTags(tags)};}
+function assertGeneration(generation:number){if(generation!==getGeneration())throw new Error('Session changed. Please try again.');}
+export const api={
+  async getStats():Promise<UserStats> {
+    if(requireMode().kind==='cloud')return invoke<UserStats>('manage-memory',{action:'stats'});
+    const all=await memories();return {total:all.length,documents:all.filter(m=>m.type==='document').length,images:all.filter(m=>m.type==='image').length,notes:all.filter(m=>m.type==='note').length,storageBytes:all.reduce((sum,m)=>sum+(m.file_size||new Blob([m.content||'']).size),0),storageLimitBytes:STORAGE_LIMIT};
+  },
+  async listMemories():Promise<Memory[]> {return (requireMode().kind==='cloud'?await pages<Memory>('memories'):await memories()).sort((a,b)=>b.created_at.localeCompare(a.created_at));},
+  async getMemory(id:string):Promise<Memory|null> {
+    if(requireMode().kind==='demo')return (await memories()).find(m=>m.id===id)||null;
+    const {client,userId}=cloudClient();const {data,error}=await client.from('memories').select('*').eq('id',id).eq('user_id',userId).maybeSingle();if(error)throw error;return data;
+  },
+  async getFileUrl(path?:string|null,id?:string|null):Promise<string|null> {
+    if(!path)return null;
+    if(requireMode().kind==='demo') {
+      if(!path.startsWith('indexeddb:demo:'))return null;
+      return getImageFromIndexedDB(path.slice('indexeddb:'.length));
     }
-    return JSON.parse(data);
-  } catch {
-    return INITIAL_DEMO_CONVERSATIONS;
-  }
-}
-
-function saveLocalConversations(conversations: ChatConversation[]) {
-  try {
-    localStorage.setItem(LOCAL_CONVERSATIONS_KEY, JSON.stringify(conversations));
-  } catch (e) {
-    console.warn('Failed to save conversations to local storage:', e);
-  }
-}
-
-function getLocalMemories(): Memory[] {
-  try {
-    const data = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (!data) {
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(INITIAL_DEMO_MEMORIES));
-      return INITIAL_DEMO_MEMORIES;
+    const {client,userId}=cloudClient();
+    if(!path.startsWith(`${userId}/`)||path.includes('..'))throw new Error('Invalid attachment path.');
+    const {data,error}=await client.storage.from('memory-files').createSignedUrl(path,300);if(error)throw error;return data.signedUrl;
+  },
+  async uploadMemory(file:File,title?:string,category='General',tags:string[]=[],extractedContent?:string):Promise<Memory> {
+    const mode=requireMode();const generation=getGeneration();const mime=fileType(file);await validateSignature(file);
+    const image=mime.startsWith('image/');let content=extractedContent?.trim()||'';
+    if(!content&&!image)content=await extractDocument(file);
+    // Only scanned PDFs/images need AI. Text-bearing documents are parsed locally.
+    if(!content&&mode.kind==='demo'&&(image||mime==='application/pdf')&&geminiService.hasApiKey()){try{content=(await geminiService.extractTextFromImage(file)).extractedText;}catch{/* Preserve originals even when the provider is unavailable. */}}
+    const input={title:text(title||file.name.replace(/\.[^.]+$/,''),'Title',200),category:validCategory(category),tags:validTags(tags)};
+    assertGeneration(generation);
+    if(mode.kind==='cloud') {
+      const body=new FormData();body.set('file',file);body.set('title',input.title);body.set('category',input.category);body.set('tags',JSON.stringify(input.tags));body.set('content',text(content,'Extracted text',MAX_CONTENT_CHARS,false));
+      return (await invoke<{memory:Memory}>('upload-memory',body)).memory;
     }
-    return JSON.parse(data);
-  } catch {
-    return INITIAL_DEMO_MEMORIES;
-  }
-}
-
-function saveLocalMemories(memories: Memory[]) {
-  try {
-    // Keep localStorage lean so high-res screenshots never trigger QuotaExceededError
-    const leanMemories = memories.map((m) => {
-      if (m.storage_path && m.storage_path.startsWith('data:') && m.storage_path.length > 500) {
-        return {
-          ...m,
-          storage_path: `indexeddb:${m.id}`,
-        };
-      }
-      return m;
+    return localMutation(async()=>{
+      const all=await memories();if(all.reduce((s,m)=>s+(m.file_size||0),0)+file.size>STORAGE_LIMIT)throw new Error('Demo vault limit exceeded. Export or delete files first.');
+      const id=crypto.randomUUID();const key=`demo:attachment:${id}`;
+      await saveImageToIndexedDB(key,file);
+      const memory:Memory={id,user_id:'demo',...input,type:image?'image':'document',content,description:content.slice(0,160)||'Original saved. Text extraction is required before this file can be searched.',storage_path:`indexeddb:${key}`,original_file_name:file.name,mime_type:mime,file_size:file.size,indexing_status:content?'ready':'failed',indexing_error:content?null:'No readable text. Configure AI and retry OCR.',created_at:new Date().toISOString(),updated_at:new Date().toISOString(),is_favorite:false};
+      try {assertGeneration(generation);await write('memories',[memory,...all]);}catch(error){await deleteImageFromIndexedDB(key);throw error;}return memory;
     });
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(leanMemories));
-  } catch (e) {
-    console.warn('Failed to save memories to local storage:', e);
-  }
-}
-
-function getLocalReminders(): Reminder[] {
-  try {
-    const data = localStorage.getItem(LOCAL_REMINDERS_KEY);
-    if (!data) {
-      localStorage.setItem(LOCAL_REMINDERS_KEY, JSON.stringify(DEMO_REMINDERS));
-      return DEMO_REMINDERS;
-    }
-    return JSON.parse(data);
-  } catch {
-    return DEMO_REMINDERS;
-  }
-}
-
-function saveLocalReminders(reminders: Reminder[]) {
-  try {
-    localStorage.setItem(LOCAL_REMINDERS_KEY, JSON.stringify(reminders));
-  } catch (e) {
-    console.warn('Failed to save reminders to local storage:', e);
-  }
-}
-
-export const USER_STORAGE_CAP_BYTES = 5 * 1024 * 1024 * 1024; // 5 GB
-
-export function formatStorageSize(bytes: number): string {
-  if (!bytes || bytes <= 0) return '0 B';
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
-  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
-}
-
-export const api = {
-  async getStats(): Promise<UserStats> {
-    const client = getSupabaseClient();
-    if (isSupabaseConfigured() && client) {
-      try {
-        const { data, error } = await client.from('memories').select('type, file_size, content');
-        if (!error && data) {
-          const storageBytes = data.reduce((acc, m) => {
-            const size = typeof m.file_size === 'number' && m.file_size > 0
-              ? m.file_size
-              : (m.content ? new Blob([m.content]).size : 0);
-            return acc + size;
-          }, 0);
-          return {
-            total: data.length,
-            documents: data.filter((m) => m.type === 'document').length,
-            notes: data.filter((m) => m.type === 'note').length,
-            images: data.filter((m) => m.type === 'image').length,
-            storageBytes,
-            storageLimitBytes: USER_STORAGE_CAP_BYTES,
-          };
-        }
-      } catch (err) {
-        console.warn('Error fetching stats from Supabase:', err);
-      }
-    }
-    const mems = getLocalMemories();
-    const storageBytes = mems.reduce((acc, m) => {
-      const size = typeof m.file_size === 'number' && m.file_size > 0
-        ? m.file_size
-        : (m.content ? new Blob([m.content]).size : 0);
-      return acc + size;
-    }, 0);
-    return {
-      total: mems.length,
-      documents: mems.filter((m) => m.type === 'document').length,
-      notes: mems.filter((m) => m.type === 'note').length,
-      images: mems.filter((m) => m.type === 'image').length,
-      storageBytes,
-      storageLimitBytes: USER_STORAGE_CAP_BYTES,
-    };
   },
-
-  async listMemories(): Promise<Memory[]> {
-    const client = getSupabaseClient();
-    if (isSupabaseConfigured() && client) {
-      try {
-        const { data, error } = await client
-          .from('memories')
-          .select('*')
-          .order('created_at', { ascending: false });
-        if (!error && data) {
-          return data as Memory[];
-        }
-      } catch (err) {
-        console.warn('Error listing memories from Supabase:', err);
-      }
-    }
-    return getLocalMemories();
+  async createNote(title:string,content:string,category='Personal',tags:string[]=[]):Promise<Memory> {
+    const input=noteInput(title,content,category,tags);
+    if(requireMode().kind==='cloud')return (await invoke<{memory:Memory}>('create-note',input)).memory;
+    return localMutation(async()=>{const all=await memories();const size=new Blob([input.content]).size;if(all.reduce((s,m)=>s+(m.file_size||0),0)+size>STORAGE_LIMIT)throw new Error('Demo vault limit exceeded.');const m:Memory={id:crypto.randomUUID(),user_id:'demo',...input,type:'note',description:input.content.slice(0,160),original_file_name:`${input.title}.txt`,file_size:size,indexing_status:'ready',created_at:new Date().toISOString(),updated_at:new Date().toISOString(),is_favorite:false};await write('memories',[m,...all]);return m;});
   },
-
-  async getMemory(id: string): Promise<Memory | null> {
-    const client = getSupabaseClient();
-    if (isSupabaseConfigured() && client) {
-      try {
-        const { data, error } = await client
-          .from('memories')
-          .select('*')
-          .eq('id', id)
-          .single();
-        if (!error && data) return data as Memory;
-      } catch (err) {
-        console.warn('Error getting memory from Supabase:', err);
-      }
-    }
-    const mems = getLocalMemories();
-    return mems.find((m) => m.id === id) || null;
+  async updateMemory(id:string,updates:Partial<Pick<Memory,'title'|'description'|'category'|'tags'|'content'|'is_favorite'|'indexing_status'>>):Promise<Memory|null> {
+    if(updates.title!==undefined)text(updates.title,'Title',200);if(updates.content!==undefined)text(updates.content,'Content',MAX_CONTENT_CHARS,false);if(updates.category!==undefined)validCategory(updates.category);if(updates.tags!==undefined)validTags(updates.tags);
+    if(requireMode().kind==='cloud')return (await invoke<{memory:Memory}>('manage-memory',{action:'update',id,updates})).memory;
+    return localMutation(async()=>{const all=await memories();const idx=all.findIndex(m=>m.id===id);if(idx<0)throw new Error('Memory not found.');const m={...all[idx],...updates,updated_at:new Date().toISOString()};if(m.type==='note')text(m.content,'Content',MAX_CONTENT_CHARS);m.file_size=m.type==='note'?new Blob([m.content||'']).size:Math.max(m.file_size||0,new Blob([m.content||'']).size);if(all.reduce((sum,item)=>sum+(item.id===id?(m.file_size||0):item.file_size||0),0)>STORAGE_LIMIT)throw new Error('Demo vault limit exceeded.');m.indexing_status=m.content?'ready':'failed';all[idx]=m;await write('memories',all);return m;});
   },
-
-  async getFileUrl(storagePath?: string | null, memoryId?: string | null): Promise<string | null> {
-    if (!storagePath && !memoryId) return null;
-    if (storagePath) {
-      if (
-        storagePath.startsWith('data:') ||
-        storagePath.startsWith('http://') ||
-        storagePath.startsWith('https://') ||
-        storagePath.startsWith('blob:')
-      ) {
-        return storagePath;
-      }
-      if (storagePath.startsWith('indexeddb:')) {
-        const key = storagePath.replace('indexeddb:', '');
-        const blob = await getImageFromIndexedDB(key);
-        if (blob) return blob;
-      }
-      const direct = await getImageFromIndexedDB(storagePath);
-      if (direct) return direct;
-    }
-
-    if (memoryId) {
-      const byId = await getImageFromIndexedDB(memoryId);
-      if (byId) return byId;
-    }
-
-    const client = getSupabaseClient();
-    if (isSupabaseConfigured() && client && storagePath) {
-      try {
-        const { data, error } = await client.storage
-          .from('memory-files')
-          .createSignedUrl(storagePath, 3600);
-        if (!error && data?.signedUrl) {
-          return data.signedUrl;
-        }
-      } catch (e) {
-        console.warn('Failed to generate signed URL for storage path:', storagePath, e);
-      }
-    }
-    return null;
+  async transcribeImageMemory(id:string):Promise<Memory> {
+    const memory=await this.getMemory(id);if(!memory)throw new Error('Memory not found.');
+    const url=await this.getFileUrl(memory.storage_path,id);if(!url)throw new Error('Original attachment not found. Re-upload the file.');
+    const result=await geminiService.extractTextFromImage(url,memory.mime_type||undefined);
+    const updated=await this.updateMemory(id,{content:result.extractedText});if(!updated)throw new Error('Could not save extracted text.');return updated;
   },
-
-  async uploadMemory(
-    file: File,
-    title?: string,
-    category = 'General',
-    tags: string[] = [],
-    extractedContent?: string
-  ): Promise<Memory> {
-    // Check 5 GB storage cap
-    const currentStats = await this.getStats();
-    if ((currentStats.storageBytes || 0) + file.size > USER_STORAGE_CAP_BYTES) {
-      throw new Error(
-        `Storage cap exceeded: Uploading "${file.name}" (${(file.size / (1024 * 1024)).toFixed(1)} MB) would exceed your 5 GB user vault limit. Please delete existing memories to free up space.`
-      );
-    }
-
-    const client = getSupabaseClient();
-    const mimeType = file.type || 'application/octet-stream';
-    const isImage = mimeType.startsWith('image/') || /\.(png|jpe?g|webp|gif|bmp|tiff|heic)$/i.test(file.name);
-    const memoryType = isImage ? 'image' : 'document';
-    const originalFileName = file.name.replace(/[^\w\.\-\s]/gi, '_');
-
-    let content = `Uploaded file: ${file.name}`;
-    let storagePath: string | undefined = undefined;
-    let indexingStatus: 'ready' | 'processing' | 'failed' = 'ready';
-
-    let dataUrl = '';
-    // Handle file preview and Gemini vision/text extraction
-    if (isImage) {
-      dataUrl = await new Promise<string>((resolve) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = () => resolve('');
-        reader.readAsDataURL(file);
-      });
-      storagePath = dataUrl;
-
-      if (extractedContent && extractedContent.trim().length > 0) {
-        content = extractedContent.trim();
-        indexingStatus = 'ready';
-      } else if (geminiService.hasApiKey()) {
-        try {
-          const visionResult = await geminiService.extractTextFromImage(file);
-          if (visionResult.extractedText) {
-            content = visionResult.extractedText;
-            if (!title && visionResult.title) title = visionResult.title;
-            if (visionResult.category && category === 'General') category = visionResult.category;
-            if (visionResult.tags && visionResult.tags.length > 0 && tags.length === 0) {
-              tags = visionResult.tags;
-            }
-            indexingStatus = 'ready';
-          }
-        } catch (e) {
-          console.warn('Vision extraction skipped:', e);
-          content = `Image uploaded: ${file.name}. Size: ${Math.round(file.size / 1024)} KB.`;
-        }
-      } else {
-        content = `Image uploaded: ${file.name}. Size: ${Math.round(file.size / 1024)} KB.`;
-      }
-    } else if (
-      mimeType.includes('text') ||
-      originalFileName.endsWith('.txt') ||
-      originalFileName.endsWith('.md') ||
-      originalFileName.endsWith('.csv') ||
-      originalFileName.endsWith('.json')
-    ) {
-      try {
-        content = await file.text();
-      } catch {
-        content = `Document: ${file.name}`;
-      }
-    }
-
-    const finalTitle = title || file.name.replace(/\.[^/.]+$/, '');
-    const finalDescription = isImage && content.length > 30 && !content.startsWith('Image uploaded:')
-      ? `Visual OCR: ${content.slice(0, 160).replace(/\s+/g, ' ')}...`
-      : `Uploaded ${file.name} (${Math.round(file.size / 1024)} KB)`;
-
-    // Direct Supabase PostgreSQL & Storage Insertion
-    if (isSupabaseConfigured() && client) {
-      try {
-        const { data: userData } = await client.auth.getUser();
-        const user = userData?.user;
-
-        if (user) {
-          let remoteStoragePath: string | undefined = undefined;
-
-          // Attempt uploading file to Supabase Cloud Storage bucket
-          try {
-            const cloudPath = `${user.id}/${Date.now()}_${originalFileName}`;
-            const { error: uploadError } = await client.storage
-              .from('memory-files')
-              .upload(cloudPath, file, { upsert: true });
-
-            if (!uploadError) {
-              remoteStoragePath = cloudPath;
-            } else {
-              console.warn('Supabase storage upload notice:', uploadError.message);
-            }
-          } catch (storageErr) {
-            console.warn('Supabase storage exception (using data/fallback):', storageErr);
-          }
-
-          const memoryRecord: Partial<Memory> = {
-            user_id: user.id,
-            title: finalTitle,
-            description: finalDescription,
-            type: memoryType,
-            category,
-            tags,
-            storage_path: remoteStoragePath || (isImage ? `indexeddb:${user.id}_${Date.now()}` : storagePath),
-            original_file_name: originalFileName,
-            mime_type: mimeType,
-            file_size: file.size,
-            indexing_status: indexingStatus,
-            is_favorite: false,
-            content,
-          };
-
-          const { data: inserted, error: insertError } = await client
-            .from('memories')
-            .insert(memoryRecord)
-            .select()
-            .single();
-
-          if (!insertError && inserted) {
-            if (isImage && dataUrl) {
-              await saveImageToIndexedDB(inserted.id, dataUrl);
-              await saveImageToIndexedDB(originalFileName, dataUrl);
-              if (remoteStoragePath) {
-                await saveImageToIndexedDB(remoteStoragePath, dataUrl);
-              }
-            }
-            return inserted as Memory;
-          } else {
-            console.warn('Supabase insert memories error, falling back to local:', insertError);
-          }
-        }
-      } catch (err) {
-        console.warn('Supabase upload flow failed, saving locally:', err);
-      }
-    }
-
-    // Local / Demo Mode Fallback
-    const localId = 'mem-' + Date.now();
-    if (isImage && dataUrl) {
-      await saveImageToIndexedDB(localId, dataUrl);
-      await saveImageToIndexedDB(originalFileName, dataUrl);
-    }
-    const safeStoragePath = isImage ? `indexeddb:${localId}` : storagePath;
-
-    const newMemory: Memory = {
-      id: localId,
-      user_id: 'current-user',
-      title: finalTitle,
-      description: finalDescription,
-      type: memoryType,
-      category,
-      tags,
-      storage_path: safeStoragePath,
-      original_file_name: originalFileName,
-      mime_type: mimeType,
-      file_size: file.size,
-      indexing_status: indexingStatus,
-      is_favorite: false,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      content,
-    };
-
-    const current = getLocalMemories();
-    current.unshift(newMemory);
-    saveLocalMemories(current);
-    return newMemory;
+  async transcribeAllPendingImages(){let count=0;let failed=0;const errors:string[]=[];for(const m of await this.listMemories()){if((m.type==='image'||m.mime_type==='application/pdf')&&m.indexing_status!=='ready'){try{await this.transcribeImageMemory(m.id);count++;}catch(e){failed++;errors.push(e instanceof Error?e.message:'OCR failed');}}}return {count,failed,errors};},
+  // A missing browser cache never authorizes deletion. Keep this compatibility method non-destructive.
+  async cleanGhostMemories():Promise<number>{throw new Error('Automatic deletion is disabled. Open a memory to retry extraction or explicitly delete it.');},
+  async askMemory(question:string,conversationId?:string):Promise<AskResponse> {
+    text(question,'Question',MAX_QUESTION_CHARS);
+    if(requireMode().kind==='cloud')return invoke<AskResponse>('ask-memory',{question,conversationId,model:geminiService.getModel()});
+    const history=conversationId?(await this.getConversation(conversationId))?.messages.slice(-8)||[]:[];
+    const all=(await memories()).filter(m=>m.indexing_status==='ready'&&m.content);
+    if(geminiService.hasApiKey())return geminiService.askMemoryWithGemini(question,all,history);
+    // Local demo search returns actual quoted excerpts, never synthetic answers or conflicts.
+    const terms=question.toLowerCase().match(/[\p{L}\p{N}]+/gu)?.filter(t=>t.length>2&&!['what','when','where','does','have','from','with','about','this','that','tell','show','give','the','and','are','for','how'].includes(t))||[];
+    const results=all.flatMap(m=>chunks(m.content||'').map(content=>({memory:m,content,score:terms.reduce((sum,t)=>sum+(content.toLowerCase().includes(t)?1:0),0)}))).filter(x=>x.score>0).sort((a,b)=>b.score-a.score).slice(0,3);
+    if(!results.length)return {answer:NOT_FOUND,sources:[],foundInformation:false,conflictDetected:false};
+    const sources=results.map(r=>({id:r.memory.id,memoryId:r.memory.id,title:r.memory.title,fileName:r.memory.original_file_name||r.memory.title,type:r.memory.type,snippet:r.content.slice(0,1000)}));
+    return {answer:'Matching excerpts from your saved memories:\n\n'+sources.map(s=>`${s.title}:\n${s.snippet}`).join('\n\n'),sources,foundInformation:true,conflictDetected:false};
   },
-
-  async createNote(
-    title: string,
-    content: string,
-    category = 'Personal',
-    tags: string[] = []
-  ): Promise<Memory> {
-    // Check 5 GB storage cap
-    const noteBytes = new Blob([content]).size;
-    const currentStats = await this.getStats();
-    if ((currentStats.storageBytes || 0) + noteBytes > USER_STORAGE_CAP_BYTES) {
-      throw new Error(
-        'Storage cap exceeded: Saving this note would exceed your 5 GB user vault limit. Please delete existing memories to free up space.'
-      );
-    }
-
-    const client = getSupabaseClient();
-    const safeTitle = title.trim();
-    const fileName = `${safeTitle.replace(/[^\w\.\-\s]/gi, '_')}.txt`;
-
-    if (isSupabaseConfigured() && client) {
-      try {
-        const { data: userData } = await client.auth.getUser();
-        const user = userData?.user;
-
-        if (user) {
-          const { data: insertedMem, error: insertError } = await client
-            .from('memories')
-            .insert({
-              user_id: user.id,
-              title: safeTitle,
-              description: content.slice(0, 100) + (content.length > 100 ? '...' : ''),
-              type: 'note',
-              category,
-              tags,
-              original_file_name: fileName,
-              mime_type: 'text/plain',
-              file_size: content.length,
-              indexing_status: 'ready',
-              is_favorite: false,
-              content,
-            })
-            .select()
-            .single();
-
-          if (!insertError && insertedMem) {
-            // Also store in notes table for relational consistency
-            try {
-              await client.from('notes').insert({
-                user_id: user.id,
-                memory_id: insertedMem.id,
-                content,
-              });
-            } catch (noteErr) {
-              console.warn('Note auxiliary insert notice:', noteErr);
-            }
-            return insertedMem as Memory;
-          }
-        }
-      } catch (err) {
-        console.warn('Failed to insert note into Supabase, saving locally:', err);
-      }
-    }
-
-    // Local / Demo Mode Fallback
-    const newMemory: Memory = {
-      id: 'note-' + Date.now(),
-      user_id: 'current-user',
-      title: safeTitle,
-      description: content.slice(0, 100) + (content.length > 100 ? '...' : ''),
-      type: 'note',
-      category,
-      tags,
-      original_file_name: fileName,
-      mime_type: 'text/plain',
-      file_size: content.length,
-      indexing_status: 'ready',
-      is_favorite: false,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      content,
-    };
-
-    const current = getLocalMemories();
-    current.unshift(newMemory);
-    saveLocalMemories(current);
-    return newMemory;
+  async deleteMemory(id:string):Promise<void> {
+    if(requireMode().kind==='cloud'){await invoke('delete-memory',{memoryId:id});return;}
+    await localMutation(async()=>{const all=await memories();const target=all.find(m=>m.id===id);const values:Record<string,string|null>={'demo:memories':JSON.stringify(all.filter(m=>m.id!==id)),'demo:reminders':JSON.stringify((await reminders()).filter(r=>r.source_memory_id!==id))};if(target?.storage_path?.startsWith('indexeddb:demo:'))values[target.storage_path.slice(10)]=null;await writeValuesToIndexedDB(values);});
   },
-
-  async updateMemory(
-    id: string,
-    updates: Partial<Pick<Memory, 'title' | 'description' | 'category' | 'tags' | 'content' | 'is_favorite' | 'indexing_status'>>
-  ): Promise<Memory | null> {
-    const client = getSupabaseClient();
-    if (isSupabaseConfigured() && client) {
-      try {
-        const { data, error } = await client
-          .from('memories')
-          .update({ ...updates, updated_at: new Date().toISOString() })
-          .eq('id', id)
-          .select()
-          .single();
-
-        if (!error && data) {
-          if (updates.content) {
-            await client.from('notes').update({ content: updates.content }).eq('memory_id', id);
-          }
-          return data as Memory;
-        }
-      } catch (err) {
-        console.warn('Supabase updateMemory notice:', err);
-      }
-    }
-
-    const current = getLocalMemories();
-    const idx = current.findIndex((m) => m.id === id);
-    if (idx === -1) return null;
-
-    current[idx] = {
-      ...current[idx],
-      ...updates,
-      updated_at: new Date().toISOString(),
-    };
-
-    saveLocalMemories(current);
-    return current[idx];
+  async toggleFavorite(id:string):Promise<Memory|null> {if(requireMode().kind==='demo')return localMutation(async()=>{const all=await memories();const memory=all.find(m=>m.id===id);if(!memory)throw new Error('Memory not found.');memory.is_favorite=!memory.is_favorite;await write('memories',all);return memory;});return (await invoke<{memory:Memory}>('manage-memory',{action:'toggle-favorite',id})).memory;},
+  async listReminders():Promise<Reminder[]> {return (requireMode().kind==='cloud'?await pages<Reminder>('reminders'):await reminders()).sort((a,b)=>(a.due_at||'9999').localeCompare(b.due_at||'9999'));},
+  async createReminder(title:string,description?:string,due_at?:string,source_memory_id?:string):Promise<Reminder> {
+    const input={title:text(title,'Title',200),description:text(description||'','Description',4000,false),due_at:dueDate(due_at),source_memory_id:source_memory_id||null};
+    const existing=await this.listReminders();const match=existing.find(r=>r.title.toLowerCase()===input.title.toLowerCase()&&r.due_at===input.due_at&&r.source_memory_id===input.source_memory_id);if(match)return match;
+    if(requireMode().kind==='cloud'){const {client,userId}=cloudClient();const {data,error}=await client.from('reminders').insert({...input,user_id:userId,status:'pending'}).select().single();if(error)throw error;return data;}
+    return localMutation(async()=>{if(source_memory_id&&!(await memories()).some(m=>m.id===source_memory_id))throw new Error('Source memory not found.');const all=await reminders();const duplicate=all.find(r=>r.title.toLowerCase()===input.title.toLowerCase()&&r.due_at===input.due_at&&r.source_memory_id===input.source_memory_id);if(duplicate)return duplicate;const r:Reminder={id:crypto.randomUUID(),user_id:'demo',...input,status:'pending',created_at:new Date().toISOString()};await write('reminders',[r,...all]);return r;});
   },
-
-  /**
-   * Transcribe a single image memory on-demand using Gemini Vision and persist result.
-   */
-  async transcribeImageMemory(memoryId: string): Promise<Memory> {
-    const mem = await this.getMemory(memoryId);
-    if (!mem) throw new Error('Memory not found');
-
-    const isImage =
-      mem.type === 'image' ||
-      /\.(png|jpe?g|webp|gif|bmp|tiff|heic)$/i.test(mem.original_file_name || '') ||
-      mem.title.toLowerCase().includes('screenshot');
-
-    if (!isImage) throw new Error(`Memory "${mem.title}" is not an image`);
-
-    if (!geminiService.hasApiKey()) {
-      throw new Error('Gemini API Key is not configured. Please enter your API key in Settings.');
-    }
-
-    let imageUrl: string | null = mem.storage_path || null;
-
-    // Check IndexedDB blob cache if storage_path is missing, short, or an indexeddb reference
-    if (!imageUrl || imageUrl.length < 50 || imageUrl.startsWith('indexeddb:')) {
-      const key = imageUrl?.startsWith('indexeddb:') ? imageUrl.replace('indexeddb:', '') : mem.id;
-      const cached = (await getImageFromIndexedDB(key)) || (await getImageFromIndexedDB(mem.id));
-      if (cached) imageUrl = cached;
-    }
-
-    if (imageUrl && !imageUrl.startsWith('data:') && !imageUrl.startsWith('http')) {
-      const signed = await this.getFileUrl(imageUrl, mem.id);
-      if (signed) {
-        imageUrl = signed;
-      } else {
-        const cached =
-          (await getImageFromIndexedDB(mem.id)) ||
-          (await getImageFromIndexedDB(mem.original_file_name || '')) ||
-          (await getImageFromIndexedDB(imageUrl));
-        imageUrl = cached || null;
-      }
-    }
-
-    if (!imageUrl) {
-      throw new Error(
-        `Original image for "${mem.title}" is missing from browser cache. Please re-upload this screenshot in "Add Memory".`
-      );
-    }
-
-    const visionResult = await geminiService.extractTextFromImage(imageUrl);
-    const updates: Partial<Memory> = {
-      content: visionResult.extractedText || mem.content,
-      title: mem.title.startsWith('Screenshot') || mem.title === 'Untitled' || !mem.title ? (visionResult.title || mem.title) : mem.title,
-      category: mem.category === 'General' && visionResult.category ? visionResult.category : mem.category,
-      tags: Array.from(new Set([...(mem.tags || []), ...(visionResult.tags || [])])),
-      description: visionResult.extractedText
-        ? `Visual OCR: ${visionResult.extractedText.slice(0, 160).replace(/\s+/g, ' ')}...`
-        : mem.description,
-      indexing_status: 'ready',
-      type: 'image',
-    };
-
-    const updated = await this.updateMemory(memoryId, updates);
-    return updated || mem;
+  async toggleReminder(id:string):Promise<Reminder|null> {
+    if(requireMode().kind==='demo')return localMutation(async()=>{const all=await reminders();const rem=all.find(r=>r.id===id);if(!rem)throw new Error('Reminder not found.');rem.status=rem.status==='pending'?'completed':'pending';await write('reminders',all);return rem;});
+    const rem=(await this.listReminders()).find(r=>r.id===id);if(!rem)throw new Error('Reminder not found.');const status=rem.status==='pending'?'completed':'pending';
+    if(requireMode().kind==='cloud'){const {client}=cloudClient();const {data,error}=await client.rpc('toggle_reminder_status',{p_id:id});if(error)throw error;if(!data?.length)throw new Error('Reminder not found.');return data[0];}
+    throw new Error('Session changed. Please try again.');
   },
-
-  /**
-   * Batch transcribe all image memories that have missing or placeholder content.
-   */
-  async transcribeAllPendingImages(): Promise<{ count: number; failed: number; errors: string[] }> {
-    if (!geminiService.hasApiKey()) {
-      throw new Error('Gemini API Key is not configured. Please add your key in Settings.');
-    }
-
-    const memories = await this.listMemories();
-    const pendingImages = memories.filter(
-      (m) =>
-        (m.type === 'image' ||
-          /\.(png|jpe?g|webp|gif|bmp|tiff|heic)$/i.test(m.original_file_name || '') ||
-          m.title.toLowerCase().includes('screenshot')) &&
-        (!m.content ||
-          m.content.startsWith('Image uploaded:') ||
-          m.content.startsWith('Uploaded file:') ||
-          m.content.startsWith('Uploaded ') ||
-          m.content.length < 60)
-    );
-
-    let count = 0;
-    let failed = 0;
-    const errors: string[] = [];
-
-    for (const mem of pendingImages) {
-      try {
-        await this.transcribeImageMemory(mem.id);
-        count++;
-      } catch (err: any) {
-        const errMsg = err?.message || 'Failed to transcribe screenshot';
-        console.warn(`Failed to transcribe memory ${mem.id}:`, errMsg);
-        failed++;
-        if (!errors.includes(errMsg)) errors.push(errMsg);
-      }
-    }
-
-    return { count, failed, errors };
+  async deleteReminder(id:string):Promise<void>{if(requireMode().kind==='cloud'){const {client,userId}=cloudClient();const {error}=await client.from('reminders').delete().eq('id',id).eq('user_id',userId);if(error)throw error;}else await localMutation(async()=>write('reminders',(await reminders()).filter(r=>r.id!==id)));},
+  async loadDemoData():Promise<number>{if(requireMode().kind!=='demo')throw new Error('Sample data is only available in the isolated demo.');await localMutation(async()=>{await write('memories',clone(INITIAL_DEMO_MEMORIES));await write('reminders',clone(DEMO_REMINDERS));await write('conversations',clone(INITIAL_DEMO_CONVERSATIONS));});return INITIAL_DEMO_MEMORIES.length;},
+  async clearAllMemories():Promise<void>{if(requireMode().kind==='cloud'){for(;;){const result=await invoke<{remaining:boolean}>('manage-memory',{action:'purge'});if(!result.remaining)break;}}else await localMutation(()=>resetDemoStorage());geminiService.setApiKey('');},
+  async listConversations():Promise<ChatConversation[]> {
+    if(requireMode().kind==='demo')return (await conversations()).sort((a,b)=>b.updated_at.localeCompare(a.updated_at));
+    const convs=await pages<{id:string;title:string;created_at:string;updated_at:string}>('conversations');const messages=await pages<{id:string;conversation_id:string;role:'user'|'assistant';content:string;sources?:Memory[];created_at:string}>('messages');
+    return convs.map(c=>({...c,messages:messages.filter(m=>m.conversation_id===c.id).sort((a,b)=>a.created_at.localeCompare(b.created_at)||a.id.localeCompare(b.id)).map(m=>({...m,timestamp:m.created_at})),activeSources:messages.filter(m=>m.conversation_id===c.id&&m.role==='assistant').sort((a,b)=>b.created_at.localeCompare(a.created_at))[0]?.sources||[]}));
   },
-
-  /**
-   * Delete empty screenshot memories that have neither extracted text nor image binary data in storage.
-   */
-  async cleanGhostMemories(): Promise<number> {
-    const list = await this.listMemories();
-    const ghostMems = list.filter(
-      (m) =>
-        (m.type === 'image' ||
-          /\.(png|jpe?g|webp|gif|bmp|tiff|heic)$/i.test(m.original_file_name || '') ||
-          m.title.toLowerCase().includes('screenshot')) &&
-        (!m.content ||
-          m.content.length < 60 ||
-          m.content.startsWith('Image uploaded:') ||
-          m.content.startsWith('Uploaded file:') ||
-          m.content.startsWith('Uploaded '))
-    );
-
-    let count = 0;
-    for (const g of ghostMems) {
-      let hasData = false;
-      if (g.storage_path && (g.storage_path.startsWith('data:') || g.storage_path.startsWith('http'))) {
-        hasData = true;
-      } else {
-        const inDb = (await getImageFromIndexedDB(g.id)) || (await getImageFromIndexedDB(g.storage_path || ''));
-        if (inDb) hasData = true;
-      }
-      if (!hasData) {
-        await this.deleteMemory(g.id);
-        count++;
-      }
-    }
-    return count;
+  async getConversation(id:string):Promise<ChatConversation|null>{return (await this.listConversations()).find(c=>c.id===id)||null;},
+  async saveConversation(conv:ChatConversation):Promise<void>{
+    if(requireMode().kind==='cloud'){await invoke('manage-memory',{action:'save-conversation',conversation:conv});return;}
+    await localMutation(async()=>{const all=await conversations();const idx=all.findIndex(c=>c.id===conv.id);const updated={...conv,created_at:idx<0?conv.created_at:all[idx].created_at,updated_at:new Date().toISOString()};if(idx<0)all.unshift(updated);else all[idx]=updated;await write('conversations',all);});
   },
-
-  async askMemory(question: string, _conversationId?: string): Promise<AskResponse> {
-    // 1. Fetch available memories (either from Supabase or Local)
-    let memories: Memory[] = [];
-    let isSupabaseUser = false;
-    const client = getSupabaseClient();
-
-    if (isSupabaseConfigured() && client) {
-      try {
-        const { data: userData } = await client.auth.getUser();
-        if (userData?.user) {
-          isSupabaseUser = true;
-          const { data, error } = await client
-            .from('memories')
-            .select('*')
-            .order('created_at', { ascending: false });
-          if (!error && data) {
-            memories = data as Memory[];
-          }
-        }
-      } catch (e) {
-        console.warn('Supabase memories fetch for Ask failed:', e);
-      }
-    }
-
-    if (!isSupabaseUser) {
-      memories = getLocalMemories();
-    }
-
-    // 2. If Gemini API key is configured, execute live Gemini grounded RAG
-    if (geminiService.hasApiKey()) {
-      try {
-        // Auto-transcribe any unindexed screenshots on-the-fly (up to 12 items)
-        const pendingImages = memories.filter(
-          (m) =>
-            (m.type === 'image' ||
-              /\.(png|jpe?g|webp|gif|bmp|tiff|heic)$/i.test(m.original_file_name || '') ||
-              m.title.toLowerCase().includes('screenshot')) &&
-            (!m.content ||
-              m.content.startsWith('Image uploaded:') ||
-              m.content.startsWith('Uploaded file:') ||
-              m.content.startsWith('Uploaded ') ||
-              m.content.length < 50)
-        );
-
-        if (pendingImages.length > 0 && pendingImages.length <= 15) {
-          await Promise.allSettled(
-            pendingImages.map(async (pim) => {
-              try {
-                let imgPath: string | null = pim.storage_path || null;
-                if (imgPath && !imgPath.startsWith('data:') && !imgPath.startsWith('http')) {
-                  imgPath = await this.getFileUrl(imgPath, pim.id);
-                }
-                if (!imgPath) {
-                  imgPath =
-                    (await getImageFromIndexedDB(pim.id)) ||
-                    (await getImageFromIndexedDB(pim.original_file_name || ''));
-                }
-                if (!imgPath) return;
-
-                const res = await geminiService.extractTextFromImage(imgPath);
-                if (res.extractedText) {
-                  pim.content = res.extractedText;
-                  if (pim.title.startsWith('Screenshot') || pim.title === 'Untitled' || !pim.title) {
-                    pim.title = res.title || pim.title;
-                  }
-                  if (res.tags && res.tags.length > 0) {
-                    pim.tags = Array.from(new Set([...(pim.tags || []), ...res.tags]));
-                  }
-                  pim.description = `Visual OCR: ${res.extractedText.slice(0, 160).replace(/\s+/g, ' ')}...`;
-                  pim.indexing_status = 'ready';
-                  await this.updateMemory(pim.id, {
-                    content: pim.content,
-                    title: pim.title,
-                    tags: pim.tags,
-                    description: pim.description,
-                    indexing_status: 'ready',
-                  });
-                }
-              } catch (e) {
-                console.warn('Auto-transcribe skipped during ask for', pim.id, e);
-              }
-            })
-          );
-        }
-
-        const geminiRes = await geminiService.askMemoryWithGemini(question, memories);
-        return geminiRes;
-      } catch (err: any) {
-        console.error('Gemini API call failed, falling back to semantic evaluator:', err);
-      }
-    }
-
-    // 3. Fallback grounded semantic evaluation
-    const qLower = question.toLowerCase().trim();
-
-    if (memories.length === 0) {
-      return {
-        answer: "You don't have any indexed memories yet. Upload a document or write a note to get started!",
-        sources: [],
-        foundInformation: false,
-        conflictDetected: false,
-      };
-    }
-
-    // Benchmark test queries ONLY when user has pure demo memories and no custom uploads
-    const isPureDemoData = memories.length > 0 && memories.every((m) => m.id.startsWith('demo-mem-'));
-
-    if (isPureDemoData) {
-      // 1. DBMS Exam query
-      if (qLower.includes('dbms') || (qLower.includes('exam') && !qLower.includes('hostel'))) {
-        const mem = memories.find((m) => m.original_file_name?.includes('exam_schedule') || m.content?.includes('DBMS examination'));
-        return {
-          answer: "Your Database Management Systems (DBMS) examination is scheduled for 24 September 2026 at 10:00 AM in Examination Hall 3, Block B.",
-          sources: mem ? [{
-            id: mem.id,
-            memoryId: mem.id,
-            title: mem.title,
-            fileName: mem.original_file_name || 'exam_schedule.pdf',
-            type: 'document',
-            citation: 'exam_schedule.pdf',
-            snippet: 'Course: Database Management Systems (CS-401)\nDBMS examination: 24 September 2026, 10:00 AM\nVenue: Examination Hall 3, Block B',
-          }] : [],
-          foundInformation: true,
-          conflictDetected: false,
-        };
-      }
-
-      // 2. Hostel Payment query
-      if (qLower.includes('hostel') || (qLower.includes('paid') && qLower.includes('room'))) {
-        const mem = memories.find((m) => m.original_file_name?.includes('hostel_receipt') || m.content?.includes('42,500'));
-        return {
-          answer: "You paid ₹42,500 for your campus hostel accommodation (Room 402, Ganga Hostel) for the Autumn Semester 2026. The payment is marked as PAID IN FULL via Net Banking (Ref: TXN94810294).",
-          sources: mem ? [{
-            id: mem.id,
-            memoryId: mem.id,
-            title: mem.title,
-            fileName: mem.original_file_name || 'hostel_receipt.pdf',
-            type: 'document',
-            citation: 'hostel_receipt.pdf',
-            snippet: 'Hostel payment: ₹42,500\nRoom: 402, Ganga Hostel\nPeriod: Autumn Semester (July - December 2026)\nPayment Status: PAID IN FULL',
-          }] : [],
-          foundInformation: true,
-          conflictDetected: false,
-        };
-      }
-
-      // 3. Project presentation preparation / professor advice query
-      if (qLower.includes('project') && (qLower.includes('prepare') || qLower.includes('presentation') || qLower.includes('professor'))) {
-        const annMem = memories.find((m) => m.original_file_name?.includes('project_announcement'));
-        const profMem = memories.find((m) => m.original_file_name?.includes('professor_notes'));
-
-        const sources: Source[] = [];
-        if (annMem) {
-          sources.push({
-            id: annMem.id,
-            memoryId: annMem.id,
-            title: annMem.title,
-            fileName: annMem.original_file_name || 'project_announcement.pdf',
-            type: 'document',
-            citation: 'project_announcement.pdf',
-            snippet: 'Final-year project presentation: 27 September 2026, 11:30 AM. Each team must present project architecture, live software demonstration, and system metrics.',
-          });
-        }
-        if (profMem) {
-          sources.push({
-            id: profMem.id,
-            memoryId: profMem.id,
-            title: profMem.title,
-            fileName: profMem.original_file_name || 'professor_notes.txt',
-            type: 'note',
-            citation: 'professor_notes.txt',
-            snippet: 'Professor said prepare project architecture, database schema and demonstration. Emphasize the end-to-end grounded RAG pipeline visually.',
-          });
-        }
-
-        return {
-          answer: "For your final-year project presentation on 27 September 2026 at 11:30 AM (Seminar Room 102), you need to prepare the project architecture, database schema, live software demonstration, and system metrics. Slides must also be submitted 24 hours in advance.",
-          sources,
-          foundInformation: true,
-          conflictDetected: false,
-        };
-      }
-
-      // 4. Internship interview query
-      if (qLower.includes('internship') || qLower.includes('interview')) {
-        const mem = memories.find((m) => m.original_file_name?.includes('internship_offer'));
-        return {
-          answer: "Your technical interview for the Software Engineering Intern role at Nova Labs is scheduled for 20 September 2026 at 2:00 PM via Google Meet with Alex Rivera. The round will cover Technical System Design and Live Coding.",
-          sources: mem ? [{
-            id: mem.id,
-            memoryId: mem.id,
-            title: mem.title,
-            fileName: mem.original_file_name || 'internship_offer.pdf',
-            type: 'document',
-            citation: 'internship_offer.pdf',
-            snippet: 'Role: Software Engineering Intern (AI & Systems)\nInternship interview: 20 September 2026, 2:00 PM\nRound: Technical System Design & Live Coding.',
-          }] : [],
-          foundInformation: true,
-          conflictDetected: false,
-        };
-      }
-
-      // 5. Tuition / fee query
-      if (qLower.includes('tuition') || qLower.includes('fee')) {
-        const mem = memories.find((m) => m.original_file_name?.includes('fee_receipt'));
-        return {
-          answer: "According to your semester fee receipt, you paid a total of ₹80,000 (₹78,000 tuition fee + ₹2,000 exam fee) on 15 August 2026 under reference HDFC-ONLINE-84729103.",
-          sources: mem ? [{
-            id: mem.id,
-            memoryId: mem.id,
-            title: mem.title,
-            fileName: mem.original_file_name || 'fee_receipt.png',
-            type: 'image',
-            citation: 'fee_receipt.png',
-            snippet: 'Tuition Fee Paid: ₹78,000\nExam Fee: ₹2,000\nTotal Amount Paid: ₹80,000\nPayment Mode: HDFC Net Banking',
-          }] : [],
-          foundInformation: true,
-          conflictDetected: false,
-        };
-      }
-
-      // 6. Conflict detection demo
-      if (qLower.includes('conflict') || (qLower.includes('date') && qLower.includes('presentation') && qLower.includes('change'))) {
-        const annMem = memories.find((m) => m.original_file_name?.includes('project_announcement'));
-        return {
-          answer: "Sources conflict regarding the project presentation date: project_update_old.txt states it was scheduled for 25 September 2026, whereas project_announcement.pdf confirms it is on 27 September 2026 at 11:30 AM.",
-          sources: [
-            {
-              id: 'src-conflict-1',
-              title: 'Project Update (Archive)',
-              fileName: 'project_update_old.txt',
-              type: 'document',
-              citation: 'project_update_old.txt',
-              snippet: 'Project presentation tentative date: 25 September 2026.',
-            },
-            {
-              id: annMem?.id || 'src-conflict-2',
-              memoryId: annMem?.id,
-              title: annMem?.title || 'Project Announcement (Official)',
-              fileName: annMem?.original_file_name || 'project_announcement.pdf',
-              type: 'document',
-              citation: 'project_announcement.pdf',
-              snippet: 'Final-year project presentation: 27 September 2026, 11:30 AM.',
-            },
-          ],
-          foundInformation: true,
-          conflictDetected: true,
-        };
-      }
-    }
-
-    // 4. General search across memories content & title
-    const searchTerms = qLower
-      .split(/\s+/)
-      .filter((w) => w.length > 2 && !['what', 'when', 'where', 'which', 'does', 'have', 'from', 'with', 'about', 'this', 'that', 'tell', 'show', 'give'].includes(w));
-
-    if (searchTerms.length > 0) {
-      let bestMem: Memory | null = null;
-      let highestScore = 0;
-
-      for (const m of memories) {
-        const textToSearch = `${m.title} ${m.description || ''} ${m.content || ''} ${m.category || ''} ${m.tags?.join(' ') || ''}`.toLowerCase();
-        let score = 0;
-        for (const term of searchTerms) {
-          if (textToSearch.includes(term)) score += 1;
-          if (m.title.toLowerCase().includes(term)) score += 2;
-        }
-        if (score > highestScore) {
-          highestScore = score;
-          bestMem = m;
-        }
-      }
-
-      if (bestMem && highestScore > 0) {
-        const snippetText = bestMem.content || bestMem.description || bestMem.title;
-        return {
-          answer: `Based on your memory "${bestMem.title}": ${bestMem.description || snippetText.slice(0, 220)}...`,
-          sources: [
-            {
-              id: bestMem.id,
-              memoryId: bestMem.id,
-              title: bestMem.title,
-              fileName: bestMem.original_file_name || bestMem.title,
-              type: bestMem.type,
-              citation: bestMem.original_file_name || bestMem.title,
-              snippet: snippetText.slice(0, 250),
-            },
-          ],
-          foundInformation: true,
-          conflictDetected: false,
-        };
-      }
-    }
-
-    // Honest not-found response with clear guidance
-    const hasImageMemories = memories.some((m) => m.type === 'image');
-    return {
-      answer: hasImageMemories && !geminiService.hasApiKey()
-        ? "I couldn't find matching information in your memories. Tip: If you're asking about your uploaded screenshots, please configure your Gemini API Key in Settings so that Memory AI can visually transcribe and search the data inside your screenshots!"
-        : "I couldn't find this information in your memories.",
-      sources: [],
-      foundInformation: false,
-      conflictDetected: false,
-    };
-  },
-
-  async deleteMemory(memoryId: string): Promise<void> {
-    const client = getSupabaseClient();
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(memoryId);
-    if (isSupabaseConfigured() && client && isUuid) {
-      try {
-        // Retrieve storage path before deletion to remove physical file from private bucket
-        const { data: mem } = await client
-          .from('memories')
-          .select('storage_path')
-          .eq('id', memoryId)
-          .single();
-
-        if (mem?.storage_path && !mem.storage_path.startsWith('data:') && !mem.storage_path.startsWith('http') && !mem.storage_path.startsWith('blob:')) {
-          await client.storage.from('memory-files').remove([mem.storage_path]);
-        }
-
-        await client.from('memories').delete().eq('id', memoryId);
-      } catch (err) {
-        console.warn('Supabase deleteMemory error:', err);
-      }
-    }
-
-    const current = getLocalMemories().filter((m) => m.id !== memoryId);
-    saveLocalMemories(current);
-
-    const rems = getLocalReminders().filter((r) => r.source_memory_id !== memoryId);
-    saveLocalReminders(rems);
-
-    try {
-      await deleteImageFromIndexedDB(memoryId);
-    } catch {}
-  },
-
-  async toggleFavorite(memoryId: string): Promise<Memory | null> {
-    const current = getLocalMemories();
-    const target = current.find((m) => m.id === memoryId);
-    if (!target) return null;
-    target.is_favorite = !target.is_favorite;
-    saveLocalMemories(current);
-
-    const client = getSupabaseClient();
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(memoryId);
-    if (isSupabaseConfigured() && client && isUuid) {
-      try {
-        await client.from('memories').update({ is_favorite: target.is_favorite }).eq('id', memoryId);
-      } catch (err) {
-        console.warn('Supabase toggleFavorite error:', err);
-      }
-    }
-    return target;
-  },
-
-  async listReminders(): Promise<Reminder[]> {
-    const client = getSupabaseClient();
-    if (isSupabaseConfigured() && client) {
-      try {
-        const { data, error } = await client
-          .from('reminders')
-          .select('*')
-          .order('due_at', { ascending: true });
-        if (!error && data) return data as Reminder[];
-      } catch (err) {
-        console.warn('Supabase listReminders error:', err);
-      }
-    }
-    return getLocalReminders();
-  },
-
-  async createReminder(
-    title: string,
-    description?: string,
-    due_at?: string,
-    source_memory_id?: string
-  ): Promise<Reminder> {
-    const client = getSupabaseClient();
-    const isSourceMemUuid = Boolean(source_memory_id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(source_memory_id));
-
-    if (isSupabaseConfigured() && client) {
-      try {
-        const { data: userData } = await client.auth.getUser();
-        const user = userData?.user;
-        if (user) {
-          const { data, error } = await client
-            .from('reminders')
-            .insert({
-              user_id: user.id,
-              title,
-              description: description || null,
-              due_at: due_at || null,
-              source_memory_id: isSourceMemUuid ? source_memory_id : null,
-              status: 'pending',
-            })
-            .select()
-            .single();
-          if (!error && data) {
-            const currentRems = getLocalReminders();
-            currentRems.unshift(data as Reminder);
-            saveLocalReminders(currentRems);
-            return data as Reminder;
-          }
-          if (error) {
-            console.warn('Supabase createReminder notice:', error.message);
-          }
-        }
-      } catch (err) {
-        console.warn('Supabase createReminder error:', err);
-      }
-    }
-
-    const newRem: Reminder = {
-      id: 'rem-' + Date.now(),
-      user_id: 'current-user',
-      title,
-      description,
-      due_at,
-      source_memory_id,
-      status: 'pending',
-      created_at: new Date().toISOString(),
-    };
-
-    const rems = getLocalReminders();
-    rems.unshift(newRem);
-    saveLocalReminders(rems);
-    return newRem;
-  },
-
-  async toggleReminder(reminderId: string): Promise<Reminder | null> {
-    const rems = getLocalReminders();
-    const rem = rems.find((r) => r.id === reminderId);
-    if (!rem) return null;
-    rem.status = rem.status === 'completed' ? 'pending' : 'completed';
-    saveLocalReminders(rems);
-
-    const client = getSupabaseClient();
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(reminderId);
-    if (isSupabaseConfigured() && client && isUuid) {
-      try {
-        await client.from('reminders').update({ status: rem.status }).eq('id', reminderId);
-      } catch (err) {
-        console.warn('Supabase toggleReminder error:', err);
-      }
-    }
-    return rem;
-  },
-
-  async deleteReminder(reminderId: string): Promise<void> {
-    const rems = getLocalReminders().filter((r) => r.id !== reminderId);
-    saveLocalReminders(rems);
-
-    const client = getSupabaseClient();
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(reminderId);
-    if (isSupabaseConfigured() && client && isUuid) {
-      try {
-        await client.from('reminders').delete().eq('id', reminderId);
-      } catch (err) {
-        console.warn('Supabase deleteReminder error:', err);
-      }
-    }
-  },
-
-  async loadDemoData(): Promise<number> {
-    saveLocalMemories(INITIAL_DEMO_MEMORIES);
-    saveLocalReminders(DEMO_REMINDERS);
-    saveLocalConversations(INITIAL_DEMO_CONVERSATIONS);
-
-    const client = getSupabaseClient();
-    if (isSupabaseConfigured() && client) {
-      try {
-        const { data: userData } = await client.auth.getUser();
-        const user = userData?.user;
-        if (user) {
-          // Bulk insert memories into Supabase with clean auto-generated UUIDs
-          const records = INITIAL_DEMO_MEMORIES.map((m) => {
-            const { id: _id, ...rest } = m;
-            return {
-              ...rest,
-              user_id: user.id,
-            };
-          });
-          await client.from('memories').insert(records);
-        }
-      } catch (e) {
-        console.warn('Supabase load demo data notice:', e);
-      }
-    }
-
-    return INITIAL_DEMO_MEMORIES.length;
-  },
-
-  async clearAllMemories(): Promise<void> {
-    const client = getSupabaseClient();
-    if (isSupabaseConfigured() && client) {
-      try {
-        const { data: userData } = await client.auth.getUser();
-        const user = userData?.user;
-        if (user) {
-          // Clean up physical storage files from Supabase bucket
-          try {
-            const { data: files } = await client.storage.from('memory-files').list(user.id);
-            if (files && files.length > 0) {
-              const paths = files.map((f) => `${user.id}/${f.name}`);
-              await client.storage.from('memory-files').remove(paths);
-            }
-          } catch (storageErr) {
-            console.warn('Supabase storage cleanup notice:', storageErr);
-          }
-
-          await client.from('memories').delete().eq('user_id', user.id);
-          await client.from('reminders').delete().eq('user_id', user.id);
-        }
-      } catch (e) {
-        console.warn('Supabase clear all notice:', e);
-      }
-    }
-    saveLocalMemories([]);
-    saveLocalReminders([]);
-  },
-
-  listConversations(): ChatConversation[] {
-    const list = getLocalConversations();
-    return list.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
-  },
-
-  getConversation(id: string): ChatConversation | null {
-    const list = getLocalConversations();
-    return list.find((c) => c.id === id) || null;
-  },
-
-  saveConversation(conv: ChatConversation): void {
-    const list = getLocalConversations();
-    const idx = list.findIndex((c) => c.id === conv.id);
-    if (idx >= 0) {
-      list[idx] = { ...conv, updated_at: new Date().toISOString() };
-    } else {
-      list.unshift({ ...conv, updated_at: new Date().toISOString() });
-    }
-    saveLocalConversations(list);
-
-    // Sync to Supabase in background if connected
-    const client = getSupabaseClient();
-    if (isSupabaseConfigured() && client) {
-      client.auth.getUser().then(async ({ data }) => {
-        const user = data?.user;
-        if (user) {
-          const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(conv.id);
-          const convId = isUuid ? conv.id : undefined;
-
-          const { data: savedConv } = await client
-            .from('conversations')
-            .upsert({
-              ...(convId ? { id: convId } : {}),
-              user_id: user.id,
-              title: conv.title,
-              updated_at: new Date().toISOString(),
-            })
-            .select()
-            .single();
-
-          const targetConvId = savedConv?.id || (isUuid ? conv.id : undefined);
-          if (targetConvId && conv.messages && conv.messages.length > 0) {
-            const lastMsg = conv.messages[conv.messages.length - 1];
-            try {
-              await client.from('messages').insert({
-                conversation_id: targetConvId,
-                user_id: user.id,
-                role: lastMsg.role,
-                content: lastMsg.content,
-                sources: lastMsg.sources || null,
-              });
-            } catch (msgErr) {
-              console.warn('Supabase message sync notice:', msgErr);
-            }
-          }
-        }
-      }).catch((e) => console.warn('Supabase saveConversation error:', e));
-    }
-  },
-
-  deleteConversation(id: string): void {
-    const list = getLocalConversations().filter((c) => c.id !== id);
-    saveLocalConversations(list);
-
-    const client = getSupabaseClient();
-    if (isSupabaseConfigured() && client) {
-      Promise.resolve(client.from('conversations').delete().eq('id', id))
-        .then(() => {})
-        .catch(() => {});
-    }
-  },
-
-  clearAllConversations(): void {
-    saveLocalConversations([]);
-    const client = getSupabaseClient();
-    if (isSupabaseConfigured() && client) {
-      client.auth
-        .getUser()
-        .then(({ data }) => {
-          const user = data?.user;
-          if (user) {
-            Promise.resolve(client.from('conversations').delete().eq('user_id', user.id))
-              .then(() => {})
-              .catch(() => {});
-          }
-        })
-        .catch(() => {});
-    }
-  },
+  async deleteConversation(id:string):Promise<void>{if(requireMode().kind==='cloud'){const {client,userId}=cloudClient();const {error}=await client.from('conversations').delete().eq('id',id).eq('user_id',userId);if(error)throw error;}else await localMutation(async()=>write('conversations',(await conversations()).filter(c=>c.id!==id)));},
+  async clearAllConversations():Promise<void>{if(requireMode().kind==='cloud'){const {client,userId}=cloudClient();const {error}=await client.from('conversations').delete().eq('user_id',userId);if(error)throw error;}else await localMutation(()=>write('conversations',[]));},
+  async exportData(){const [memories,reminders,conversations]=await Promise.all([this.listMemories(),this.listReminders(),this.listConversations()]);const attachments:Record<string,string>={};for(const m of memories){if(m.storage_path){const url=await this.getFileUrl(m.storage_path,m.id);if(url){const response=await fetch(url);if(!response.ok)throw new Error('Could not export an attachment. Try again.');const blob=await response.blob();attachments[m.id]=await new Promise<string>((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result as string);reader.onerror=()=>reject(reader.error);reader.readAsDataURL(blob);});}}}return {version:2,exportedAt:new Date().toISOString(),memories,reminders,conversations,attachments};},
 };
