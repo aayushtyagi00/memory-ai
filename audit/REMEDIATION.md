@@ -1,3 +1,7 @@
+## 8 November account access update
+
+Demo login has been removed and restored sessions are verified with Supabase. Account-owned keys persist after a successful connection test. A new RLS table prevents cross-account reads/writes and duplicate key registration. The migration was applied to production. Keys are accessible to privileged database administrators; they are not end-to-end encrypted. Validation: 45 unit/database tests, production build and an unauthenticated browser test covering all main protected routes passed. Prior demo browser workflows are archived in `audit/legacy-demo-browser-tests.ts` because demo access is no longer supported. The historical validation below predates this change.
+
 # Remediation and verification — 6 November 2026
 
 The baseline audit is historical. The application source has been repaired; this file records the current state and limits of verification.

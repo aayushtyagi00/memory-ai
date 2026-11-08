@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 
 export const LandingPage: React.FC = () => {
-  const { user, isLoading, enableDemoUser } = useAuth();
+  const { user, isLoading } = useAuth();
   const navigate = useNavigate();
 
   // If user is already authenticated, redirect directly to /dashboard
@@ -36,13 +36,7 @@ export const LandingPage: React.FC = () => {
     }
   };
 
-  const handleExploreDemo = async (e: React.MouseEvent) => {
-    e.preventDefault();
-    if (!user) {
-      await enableDemoUser();
-    }
-    navigate('/ask');
-  };
+
 
   return (
     <div className="min-h-screen bg-bg-base text-text-primary flex flex-col font-sans selection:bg-accent-soft selection:text-text-primary">
@@ -85,13 +79,7 @@ export const LandingPage: React.FC = () => {
               <span>{user ? 'Go to Dashboard' : 'Start Building My Memory'}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
-            <button
-              onClick={handleExploreDemo}
-              className="w-full sm:w-auto font-medium text-sm text-text-primary bg-bg-elevated hover:bg-bg-hover px-7 py-3.5 rounded-xl border border-border transition-all flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <Search className="w-4 h-4 text-text-secondary" />
-              <span>Explore Interactive Demo</span>
-            </button>
+
           </div>
 
           {/* The Core Pipeline Visualization (The Architectural Truth) */}

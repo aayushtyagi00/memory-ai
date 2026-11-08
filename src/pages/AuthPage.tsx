@@ -36,7 +36,7 @@ export const AuthPage: React.FC = () => {
   const [resetLoading, setResetLoading] = useState(false);
   const [resetMessage, setResetMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  const { signIn, signUp, signInWithGoogle, user, resetPassword, enableDemoUser } = useAuth();
+  const { signIn, signUp, signInWithGoogle, user, resetPassword } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -275,8 +275,6 @@ export const AuthPage: React.FC = () => {
 
               {/* Auth Container Box */}
               <div className="relative z-10 w-full max-w-sm p-6 sm:p-8 rounded-2xl bg-bg-elevated border border-border shadow-2xl flex flex-col gap-4">
-                
-                <button type="button" className="border border-border rounded p-3 text-sm" onClick={async()=>{await enableDemoUser();navigate('/dashboard');}}>Open local demo (no account)</button>
                 {/* Segmented Toggle */}
                 <div className="w-full grid grid-cols-2 p-1 bg-bg-base rounded-xl border border-border">
                   <button

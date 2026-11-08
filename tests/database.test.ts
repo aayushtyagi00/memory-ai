@@ -16,7 +16,7 @@ beforeAll(async()=>{
  create function storage.foldername(name text) returns text[] language sql immutable as $$ select string_to_array(name,'/') $$;
  alter default privileges in schema public grant all on tables to anon,authenticated,service_role;
  alter default privileges in schema public grant execute on functions to anon,authenticated,service_role;`);
- for(const file of ['20260919000000_memory_ai_init.sql','20260925000000_security_and_performance_fix.sql','20261105000000_authoritative_vault.sql','20261105010000_reminder_delivery.sql','20261106000000_atomic_toggles.sql'])await db.exec(readFileSync('supabase/migrations/'+file,'utf8'));
+ for(const file of ['20260919000000_memory_ai_init.sql','20260925000000_security_and_performance_fix.sql','20261105000000_authoritative_vault.sql','20261105010000_reminder_delivery.sql','20261106000000_atomic_toggles.sql','20261108000000_account_api_keys.sql'])await db.exec(readFileSync('supabase/migrations/'+file,'utf8'));
  await db.exec(`insert into auth.users(id,email) values('${A}','a@example.invalid'),('${B}','b@example.invalid');insert into public.memories(id,user_id,title,content,type,file_size) values('${memoryA}','${A}','A private','Exam deadline is 10 December 2026.','note',33),('${memoryB}','${B}','B private','Confidential salary information.','note',31);`);
 });
 afterAll(()=>db.close());
@@ -32,4 +32,15 @@ describe('actual PostgreSQL migrations and tenant boundaries',()=>{
  it('requires email opt-in and leases due reminders only once',async()=>{const id='eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';await db.exec(`insert into public.reminders(id,user_id,title,due_at) values('${id}','${A}','Due email',now()-interval '1 hour')`);expect((await db.query('select * from public.claim_due_reminders()')).rows).toEqual([]);await asUser(A,`update public.profiles set email_reminders=true where id='${A}'`);expect((await db.query('select * from public.claim_due_reminders()')).rows).toHaveLength(1);expect((await db.query('select * from public.claim_due_reminders()')).rows).toEqual([]);await expect(asUser(A,`update public.reminders set delivered_at=now() where id='${id}'`)).rejects.toThrow('permission denied');});
  it('rate limits privileged AI requests and does not expose the counter RPC to clients',async()=>{for(let i=0;i<30;i++)expect((await db.query<{allowed:boolean}>(`select public.consume_request('${A}','ai') as allowed`)).rows[0].allowed).toBe(true);expect((await db.query<{allowed:boolean}>(`select public.consume_request('${A}','ai') as allowed`)).rows[0].allowed).toBe(false);await expect(asUser(A,`select public.consume_request('${B}','ai')`)).rejects.toThrow('permission denied');});
  it('reindexes edits and cascades text chunks on deletion',async()=>{await db.exec(`update public.memories set content='Revised project deadline January 2027' where id='${memoryA}'`);const updated=await asUser<{content:string}>(A,"select * from public.search_memory_chunks('Revised project')");expect(updated.rows[0].content).toContain('Revised');await db.exec(`delete from public.memories where id='${memoryA}'`);const rows=await db.query(`select * from public.memory_chunks where memory_id='${memoryA}'`);expect(rows.rows).toEqual([]);});
+});
+
+it('isolates saved keys and rejects reuse by another account',async()=>{
+ await asUser(A,`insert into public.account_api_keys(user_id,api_key) values ('${A}','account-a-test-key')`);
+ expect((await asUser(B,'select * from public.account_api_keys')).rows).toEqual([]);
+ await expect(asUser(B,`insert into public.account_api_keys(user_id,api_key) values ('${A}','forged-test-key')`)).rejects.toThrow();
+ await expect(asUser(B,`insert into public.account_api_keys(user_id,api_key) values ('${B}','account-a-test-key')`)).rejects.toThrow();
+ await asUser(B,`update public.account_api_keys set api_key='stolen-test-key' where user_id='${A}'`);
+ await asUser(B,`delete from public.account_api_keys where user_id='${A}'`);
+ expect((await asUser<{api_key:string}>(A,'select api_key from public.account_api_keys')).rows[0].api_key).toBe('account-a-test-key');
+ await expect(db.transaction(async tx=>{await tx.exec('set local role anon');return tx.query('select * from public.account_api_keys');})).rejects.toThrow();
 });

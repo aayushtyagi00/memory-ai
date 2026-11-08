@@ -862,7 +862,7 @@ export const AskMemoryPage: React.FC = () => {
               </div>
               <div>
                 <h3 className="text-sm font-bold text-text-primary">Connect Gemini API Key</h3>
-                <p className="text-[11px] text-text-muted">Requests go directly to Google using your account. Your key stays in this tab until reload or sign-out.</p>
+                <p className="text-[11px] text-text-muted">This quick key is temporary. Use Settings → Test Connection to save a key to your signed-in account.</p>
               </div>
             </div>
 

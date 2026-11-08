@@ -1,3 +1,7 @@
+## Account key storage update — 8 November 2026
+
+Apply `20261108000000_account_api_keys.sql` with `npx.cmd supabase db push --remote` before deploying this frontend. Demo login is removed, including legacy session flags. Successful Settings connection tests save the personal key to an account-owned Supabase table; RLS isolates reads/writes and a unique constraint rejects duplicate keys across accounts. Account ownership uses the Supabase auth UUID, not an editable email address. Keys remain retrievable by privileged database administrators; this is not end-to-end encryption. AI requests still go directly to Google. Sign-out clears the in-memory key, and signing in restores the saved key. Deleting an auth account cascades its key. The older session-only notes below describe the previous release.
+
 # Deployment
 
 Code changes do not update a hosted database or deploy functions automatically. Deploy the migrations, functions, and frontend together. Do not use the new frontend against the old write policies.

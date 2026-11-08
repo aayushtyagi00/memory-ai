@@ -9,6 +9,7 @@ import { api, formatStorageSize, USER_STORAGE_CAP_BYTES } from '../services/api'
 import { UserStats } from '../types';
 import { geminiService, SUPPORTED_MODELS, DEFAULT_MODEL } from '../services/gemini';
 import { useAIStatus } from '../hooks/useAIStatus';
+import {saveAccountKey} from '../services/accountKey';
 import {getGeneration} from '../lib/storageMode';
 import {
   User,
@@ -62,7 +63,7 @@ export const SettingsPage: React.FC = () => {
     const existingKey = geminiService.getApiKey();
     setApiKey(existingKey);
     setSelectedModel(geminiService.getModel());
-  }, [user?.id]);
+  }, [user?.id, aiStatus]);
 
   const loadStats = async () => {
     try {
@@ -73,7 +74,9 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
-  const handleSaveApiKey = () => {
+  const handleSaveApiKey = async () => {
+    if(apiKey.trim()){await handleTestApiKey();return;}
+    try {await saveAccountKey('');}catch(error){reportError(error);return;}
     geminiService.setApiKey(apiKey);
     geminiService.setModel(selectedModel);
     setSaveKeySuccess(true);
@@ -89,7 +92,8 @@ export const SettingsPage: React.FC = () => {
       if(generation!==getGeneration())return;
       setTestResult(res);
       if (res.success) {
-        geminiService.setApiKey(apiKey);
+        await saveAccountKey(apiKey);
+        setSaveKeySuccess(true);
         geminiService.setModel(selectedModel);
       }
     } catch (err: any) {
@@ -352,7 +356,7 @@ export const SettingsPage: React.FC = () => {
             </div>
           </div>
           <span className="text-[10px] text-text-muted">
-            Your key stays in this tab’s memory until reload or sign-out. It is sent only to Google, never saved to Supabase or browser storage. Save an empty key to remove it.
+            After a successful connection test, your key is saved to your signed-in account in Supabase. Other app accounts cannot read it. Sign-out clears the browser copy; sign-in restores your saved key. Save an empty key to remove it.
           </span>
         </div>
 
